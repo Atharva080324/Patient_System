@@ -1,6 +1,9 @@
 allowBuilds:
   sharp: false
   unrs-resolver: false
+  mongodb-memory-server: true
+  '@node-rs/argon2': true
+  esbuild: true
 minimumReleaseAgeExclude:
   - '@next/env@16.4.3'
   - '@next/eslint-plugin-next@16.4.3'

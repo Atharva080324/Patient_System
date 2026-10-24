@@ -1,26 +1,36 @@
+@import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible+Next:ital,wght@0,200..800;1,200..800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --font-clinical: 'Atkinson Hyperlegible Next', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  --font-devanagari: 'Noto Sans Devanagari', 'Atkinson Hyperlegible Next', sans-serif;
+  
+  --ink: #151a22;
+  --navy: #0a1a3f;
+  --navy-hover: #12285a;
+  --surface: #f8fafc;
+  --surface-subtle: #f1f5f9;
+  --surface-border: #cbd5e1;
+  --danger: #b91c1c;
+  --danger-bg: #fef2f2;
+  --success: #15803d;
+  --success-bg: #f0fdf4;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  color: var(--ink);
+  background-color: #ffffff;
+  font-family: var(--font-clinical);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 44px touch targets minimum for buttons and form inputs */
+button, input, select, textarea {
+  min-height: 44px;
+}
+
+/* High-visibility clinical focus state */
+:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
 }
