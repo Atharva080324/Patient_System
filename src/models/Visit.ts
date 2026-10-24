@@ -1,7 +1,13 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import { tenancyPlugin, TenantActor } from '../lib/tenancy';
 
-export type VisitStatus = 'WAITING' | 'IN_CONSULTATION' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
+export type VisitStatus =
+  | 'WAITING'
+  | 'IN_CONSULTATION'
+  | 'COMPLETED'
+  | 'SKIPPED'
+  | 'NO_SHOW'
+  | 'CANCELLED';
 export type VisitType = 'WALK_IN' | 'APPOINTMENT';
 
 export interface IToothFinding {
@@ -39,6 +45,9 @@ export interface IVisit extends Document {
   checkInAt: Date;
   startedAt?: Date;
   completedAt?: Date;
+  skippedAt?: Date;
+  noShowAt?: Date;
+  cancelledAt?: Date;
   reasonForVisit: string;
   caseSheet: ICaseSheet;
   prescriptionId?: mongoose.Types.ObjectId;
@@ -61,13 +70,16 @@ const VisitSchema = new Schema<IVisit>(
     type: { type: String, enum: ['WALK_IN', 'APPOINTMENT'], required: true },
     status: {
       type: String,
-      enum: ['WAITING', 'IN_CONSULTATION', 'COMPLETED', 'SKIPPED', 'CANCELLED'],
+      enum: ['WAITING', 'IN_CONSULTATION', 'COMPLETED', 'SKIPPED', 'NO_SHOW', 'CANCELLED'],
       default: 'WAITING',
       required: true,
     },
     checkInAt: { type: Date, required: true },
     startedAt: { type: Date },
     completedAt: { type: Date },
+    skippedAt: { type: Date },
+    noShowAt: { type: Date },
+    cancelledAt: { type: Date },
     reasonForVisit: { type: String, required: true },
     caseSheet: {
       chiefComplaint: { type: String, default: '' },
@@ -117,6 +129,11 @@ const VisitSchema = new Schema<IVisit>(
 // visits {clinicId, patientId, date};
 VisitSchema.index({ clinicId: 1, date: 1, token: 1 }, { unique: true });
 VisitSchema.index({ clinicId: 1, patientId: 1, date: 1 });
+// Single active consultation per clinic invariant:
+VisitSchema.index(
+  { clinicId: 1, status: 1 },
+  { unique: true, partialFilterExpression: { status: 'IN_CONSULTATION' } }
+);
 
 VisitSchema.plugin(tenancyPlugin);
 

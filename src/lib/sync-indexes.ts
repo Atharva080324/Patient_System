@@ -19,6 +19,7 @@ import {
   DeviceToken,
   RateLimit,
   Session,
+  IdempotencyKey,
 } from '../models';
 
 export const ALL_MODELS: Model<any>[] = [
@@ -41,6 +42,7 @@ export const ALL_MODELS: Model<any>[] = [
   DeviceToken,
   RateLimit,
   Session,
+  IdempotencyKey,
 ];
 
 export async function syncDatabaseIndexes(): Promise<Record<string, any>> {
