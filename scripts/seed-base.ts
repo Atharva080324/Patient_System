@@ -1,10 +1,11 @@
 import { connectDb, disconnectDb } from '../src/lib/db';
 import { assertSafeDatabase } from './script-utils';
 import { Clinic } from '../src/models/Clinic';
+import { User } from '../src/models/User';
 import { Treatment, TreatmentUnit } from '../src/models/Treatment';
 import { Medicine, MedicineForm } from '../src/models/Medicine';
 import { systemScope } from '../src/lib/tenancy';
-import { hashKioskPin } from '../src/lib/passwords';
+import { hashKioskPin, hashPassword } from '../src/lib/passwords';
 
 interface IDATreatmentDef {
   code: string;
@@ -83,6 +84,29 @@ async function main() {
   const clinicId = clinic._id;
 
   await systemScope(clinicId, async () => {
+    console.log('Seeding default doctor account (idempotent)...');
+    const doctorPasswordHash = await hashPassword('DoctorPassword1234!');
+    await User.findOneAndUpdate(
+      { email: 'dr.susheel@example.com' },
+      {
+        $set: {
+          clinicId,
+          name: 'Dr. Susheel Chauthmal',
+          role: 'DOCTOR',
+          passwordHash: doctorPasswordHash,
+          phone: '9822000000',
+          active: true,
+          totpEnabled: false,
+        },
+        $setOnInsert: {
+          email: 'dr.susheel@example.com',
+          createdBy: { type: 'SYSTEM', id: 'seed' },
+        },
+      },
+      { upsert: true }
+    );
+    console.log('✓ Doctor account synced: dr.susheel@example.com');
+
     console.log('Seeding 28 IDA treatments (idempotent)...');
     for (const t of IDA_28_TREATMENTS) {
       await Treatment.findOneAndUpdate(

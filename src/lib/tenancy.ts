@@ -28,7 +28,13 @@ export interface TenantContext {
   isSystem?: boolean;
 }
 
-const storage = new AsyncLocalStorage<TenantContext>();
+declare global {
+  // eslint-disable-next-line no-var
+  var __tenantStorage: AsyncLocalStorage<TenantContext> | undefined;
+}
+
+const storage: AsyncLocalStorage<TenantContext> =
+  globalThis.__tenantStorage || (globalThis.__tenantStorage = new AsyncLocalStorage<TenantContext>());
 
 export function getTenantContext(): TenantContext | undefined {
   return storage.getStore();

@@ -132,7 +132,12 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     });
     const doctorPage = await doctorContext.newPage();
 
-    // 1. Doctor opens Live Queue
+    // 1. Doctor logs in and opens Live Queue
+    await doctorPage.goto('/login');
+    await doctorPage.fill('#email', 'dr.susheel@example.com');
+    await doctorPage.fill('#password', 'DoctorPassword1234!');
+    await doctorPage.click('button[type="submit"]');
+    await doctorPage.waitForTimeout(1000);
     await doctorPage.goto('/queue');
     await doctorPage.waitForSelector('h1');
 
@@ -190,7 +195,12 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     await page.click('#btn-register-submit');
     await page.waitForSelector('#token-display');
 
-    // Now Doctor opens the Queue
+    // Now Doctor logs in and opens the Queue
+    await page.goto('/login');
+    await page.fill('#email', 'dr.susheel@example.com');
+    await page.fill('#password', 'DoctorPassword1234!');
+    await page.click('button[type="submit"]');
+    await page.waitForTimeout(1000);
     await page.goto('/queue');
     await page.waitForSelector(`text=${patientName}`);
 

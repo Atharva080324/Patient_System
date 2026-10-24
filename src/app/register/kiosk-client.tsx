@@ -348,7 +348,7 @@ export function KioskClient({ initialUnlocked }: KioskClientProps) {
           </p>
 
           <div className="mt-8 pt-6 border-t border-slate-100 flex flex-col items-center gap-4">
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-slate-600">
               Screen will reset automatically in{' '}
               <span className="font-semibold text-slate-700 font-mono">
                 {resetCountdown}s
@@ -580,7 +580,7 @@ export function KioskClient({ initialUnlocked }: KioskClientProps) {
                 Mobile Number <span className="text-red-500">*</span>
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-semibold text-lg">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600 font-semibold text-lg">
                   +91
                 </span>
                 <input
@@ -630,7 +630,7 @@ export function KioskClient({ initialUnlocked }: KioskClientProps) {
                 onChange={(e) => setReasonForVisit(e.target.value)}
                 className="w-full text-base p-4 rounded-xl border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 outline-none transition placeholder-slate-400"
               />
-              <span className="block text-right text-xs text-slate-400 mt-1">
+              <span className="block text-right text-xs text-slate-600 mt-1">
                 {reasonForVisit.length}/200
               </span>
             </div>
