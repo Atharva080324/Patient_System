@@ -7,6 +7,7 @@ export default defineConfig({
     environment: 'node',
     include: ['tests/**/*.test.ts'],
     exclude: ['tests/e2e/**/*', 'node_modules/**/*'],
+    fileParallelism: false,
     testTimeout: 60000,
     hookTimeout: 60000,
     coverage: {
@@ -24,6 +25,11 @@ export default defineConfig({
         'src/lib/totp.ts',
         'src/lib/qr.ts',
         'src/lib/csrf.ts',
+        'src/lib/visit-state-machine.ts',
+        'src/lib/duplicate-detector.ts',
+        'src/lib/registration-service.ts',
+        'src/lib/queue-service.ts',
+        'src/lib/closing-report-service.ts',
       ],
       thresholds: {
         perFile: true,

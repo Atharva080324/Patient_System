@@ -21,9 +21,7 @@ export const RegistrationInputSchema = z
     sex: z.enum(['Male', 'Female', 'Other']),
     phone: indianMobile,
     reasonForVisit: z.string().trim().min(1).max(200),
-    consent: z.literal(true, {
-      errorMap: () => ({ message: 'Consent must be accepted' }),
-    }),
+    consent: z.literal(true, { message: 'Consent must be accepted' }),
     consentTextVersion: z.string().min(1).default('1.0'),
     idempotencyKey: z.string().uuid(),
     confirm_hp: z.string().optional(), // Honeypot field
@@ -254,7 +252,11 @@ export async function registerWalkInPatient(
     return result;
   } catch (error) {
     // If registration failed, delete idempotency key so client can retry
-    await IdempotencyKey.deleteOne({ clinicId: cId, key: validated.idempotencyKey }).catch(() => {});
+    try {
+      await IdempotencyKey.deleteOne({ clinicId: cId, key: validated.idempotencyKey });
+    } catch {
+      // Ignore cleanup error
+    }
     throw error;
   }
 }

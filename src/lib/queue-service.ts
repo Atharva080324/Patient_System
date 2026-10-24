@@ -72,19 +72,29 @@ export async function getLiveQueue(
   const cId = typeof clinicId === 'string' ? new Types.ObjectId(clinicId) : clinicId;
   const now = clock.now();
 
-  // Optimized single pipeline fetch: fetch visits for date with patient projection
-  const visits = await Visit.find({ clinicId: cId, date: targetDate })
-    .select('token status checkInAt startedAt completedAt reasonForVisit type version patientId')
-    .populate({
-      path: 'patientId',
-      select: 'name ageYears dob sex possibleDuplicateOf',
-      populate: {
-        path: 'possibleDuplicateOf',
-        select: 'patientCode',
-      },
+  // 1. Fetch lightweight status and timestamp projection for all visits of the day (fast counter calculation)
+  // 2. Fetch and populate only active visits (WAITING, IN_CONSULTATION, SKIPPED)
+  const [allVisitsSummary, activeVisits] = await Promise.all([
+    Visit.find({ clinicId: cId, date: targetDate })
+      .select('status checkInAt startedAt completedAt')
+      .lean(),
+    Visit.find({
+      clinicId: cId,
+      date: targetDate,
+      status: { $in: ['WAITING', 'IN_CONSULTATION', 'SKIPPED'] },
     })
-    .sort({ token: 1 })
-    .lean();
+      .select('token status checkInAt startedAt reasonForVisit type version patientId')
+      .populate({
+        path: 'patientId',
+        select: 'name ageYears dob sex possibleDuplicateOf',
+        populate: {
+          path: 'possibleDuplicateOf',
+          select: 'patientCode',
+        },
+      })
+      .sort({ token: 1 })
+      .lean(),
+  ]);
 
   let waiting = 0;
   let inConsultation = 0;
@@ -94,9 +104,7 @@ export async function getLiveQueue(
   let totalWaitMinutes = 0;
   let waitSampleCount = 0;
 
-  const activeItems: QueueItem[] = [];
-
-  for (const visit of visits) {
+  for (const visit of allVisitsSummary) {
     const status = visit.status as VisitStatus;
     const checkIn = new Date(visit.checkInAt);
     let waitMinutes = 0;
@@ -122,31 +130,42 @@ export async function getLiveQueue(
     } else if (status === 'SKIPPED' || status === 'NO_SHOW') {
       skippedOrNoShow++;
     }
+  }
 
-    // Active queue includes WAITING, IN_CONSULTATION, and SKIPPED
-    if (status === 'WAITING' || status === 'IN_CONSULTATION' || status === 'SKIPPED') {
-      const patient = visit.patientId as any;
-      const isDuplicate = !!patient?.possibleDuplicateOf;
-      const possibleCode = patient?.possibleDuplicateOf?.patientCode;
+  const activeItems: QueueItem[] = [];
 
-      activeItems.push({
-        id: visit._id.toString(),
-        token: visit.token,
-        status,
-        patientId: patient?._id?.toString() || '',
-        patientName: patient?.name || 'Unknown Patient',
-        ageYears: patient?.ageYears,
-        dob: patient?.dob,
-        sex: patient?.sex || 'Other',
-        reasonForVisit: visit.reasonForVisit,
-        checkInAt: checkIn.toISOString(),
-        waitingMinutes: waitMinutes,
-        duplicateFlag: isDuplicate,
-        possibleDuplicateOfCode: possibleCode,
-        source: visit.type,
-        version: visit.version,
-      });
+  for (const visit of activeVisits) {
+    const status = visit.status as VisitStatus;
+    const checkIn = new Date(visit.checkInAt);
+    let waitMinutes = 0;
+
+    if (visit.startedAt) {
+      waitMinutes = Math.max(0, Math.floor((new Date(visit.startedAt).getTime() - checkIn.getTime()) / 60000));
+    } else {
+      waitMinutes = Math.max(0, Math.floor((now.getTime() - checkIn.getTime()) / 60000));
     }
+
+    const patient = visit.patientId as any;
+    const isDuplicate = !!patient?.possibleDuplicateOf;
+    const possibleCode = patient?.possibleDuplicateOf?.patientCode;
+
+    activeItems.push({
+      id: visit._id.toString(),
+      token: visit.token,
+      status,
+      patientId: patient?._id?.toString() || '',
+      patientName: patient?.name || 'Unknown Patient',
+      ageYears: patient?.ageYears,
+      dob: patient?.dob,
+      sex: patient?.sex || 'Other',
+      reasonForVisit: visit.reasonForVisit,
+      checkInAt: checkIn.toISOString(),
+      waitingMinutes: waitMinutes,
+      duplicateFlag: isDuplicate,
+      possibleDuplicateOfCode: possibleCode,
+      source: visit.type,
+      version: visit.version,
+    });
   }
 
   // Sort queue: IN_CONSULTATION first, then WAITING by token, then SKIPPED by token
