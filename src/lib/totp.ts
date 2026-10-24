@@ -1,7 +1,7 @@
 import { generateSecret, generateURI, verifySync, generateSync } from 'otplib';
-import QRCode from 'qrcode';
 import crypto from 'crypto';
 import { hashToken } from './passwords';
+import { generateQRCodeDataURL } from './qr';
 
 export interface TOTPSetupResult {
   secret: string;
@@ -26,7 +26,7 @@ export function getTOTPUrl(email: string, secret: string, issuer = "Dr. Susheel'
 export async function generateTOTPSetup(email: string): Promise<TOTPSetupResult> {
   const secret = generateTOTPSecret();
   const otpauthUrl = getTOTPUrl(email, secret);
-  const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+  const qrCodeDataUrl = generateQRCodeDataURL(otpauthUrl);
 
   const recoveryCodes: string[] = [];
   const hashedRecoveryCodes: Array<{ hash: string; usedAt?: Date }> = [];

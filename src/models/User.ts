@@ -13,6 +13,7 @@ export interface IUser extends Document {
   passwordHash: string;
   totpSecret?: string;
   totpEnabled: boolean;
+  lastTotpCode?: string;
   recoveryCodes: IRecoveryCode[];
   role: 'DOCTOR';
   lastPasswordChangeAt?: Date;
@@ -31,6 +32,7 @@ const UserSchema = new Schema<IUser>(
     passwordHash: { type: String, required: true },
     totpSecret: { type: String },
     totpEnabled: { type: Boolean, default: false },
+    lastTotpCode: { type: String },
     recoveryCodes: [
       {
         hash: { type: String, required: true },
