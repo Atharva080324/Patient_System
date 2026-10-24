@@ -48,7 +48,11 @@ export async function generateTOTPSetup(email: string): Promise<TOTPSetupResult>
   };
 }
 
-export function verifyTOTPCode(token: string, secret: string): boolean {
+export function verifyTOTPCode(token: string, secret: string, lastTotpCode?: string): boolean {
+  if (lastTotpCode && lastTotpCode.trim() === token.trim()) {
+    // Replay attack prevention: exact same code cannot be reused
+    return false;
+  }
   try {
     const res = verifySync({ token, secret });
     return res.valid;

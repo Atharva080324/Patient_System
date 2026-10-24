@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { publicRoute, createSession, getSessionCookieName } from '@/lib/auth';
+import { publicRoute, rotateSession, getSessionCookieName } from '@/lib/auth';
 import { User } from '@/models/User';
 import { verifyTOTPCode } from '@/lib/totp';
 import { hashToken } from '@/lib/passwords';
@@ -65,15 +65,31 @@ export const POST = publicRoute(async (req: NextRequest) => {
   let codeValid = false;
 
   if (isRecoveryCode) {
-    const codeHash = hashToken(code.toUpperCase());
-    const matched = user.recoveryCodes.find((c) => c.hash === codeHash && !c.usedAt);
-    if (matched) {
-      matched.usedAt = clock.now();
-      await user.save();
+    const codeHash = hashToken(code.toUpperCase().trim());
+    const updatedUser = await User.findOneAndUpdate(
+      {
+        _id: user._id,
+        'recoveryCodes.hash': codeHash,
+        'recoveryCodes.usedAt': { $exists: false },
+      },
+      {
+        $set: {
+          'recoveryCodes.$.usedAt': clock.now(),
+          lastLoginAt: clock.now(),
+        },
+      },
+      { returnDocument: 'after' }
+    );
+    if (updatedUser) {
       codeValid = true;
     }
   } else {
-    codeValid = verifyTOTPCode(code, user.totpSecret);
+    codeValid = verifyTOTPCode(code, user.totpSecret, user.lastTotpCode);
+    if (codeValid) {
+      user.lastTotpCode = code;
+      user.lastLoginAt = clock.now();
+      await user.save();
+    }
   }
 
   if (!codeValid) {
@@ -91,11 +107,9 @@ export const POST = publicRoute(async (req: NextRequest) => {
     return NextResponse.json({ error: 'Invalid verification code' }, { status: 401 });
   }
 
-  // Issue authenticated session
-  const { token } = await createSession(user._id, user.clinicId, ip, userAgent);
-
-  user.lastLoginAt = clock.now();
-  await user.save();
+  // Issue authenticated session with ID rotation
+  const existingCookie = req.cookies.get(getSessionCookieName())?.value;
+  const { token } = await rotateSession(existingCookie, user._id, user.clinicId, ip, userAgent);
 
   await audit.record({
     clinicId: user.clinicId,

@@ -13,6 +13,7 @@ import { audit } from './audit';
 import { AuditAction } from '../models/AuditLog';
 import { RateLimitRules } from './rate-limit';
 import { env } from './env';
+import { verifyCsrf } from './csrf';
 
 export const SESSION_COOKIE_NAME = '__Host-session';
 export const KIOSK_COOKIE_NAME = '__Host-kiosk';
@@ -126,6 +127,23 @@ export async function revokeSession(token: string): Promise<void> {
   await systemAdminScope(async () => {
     await Session.updateOne({ tokenHash }, { $set: { revokedAt: clock.now() } });
   });
+}
+
+/**
+ * Rotates a user session: revokes previous token if provided,
+ * and issues a brand new session with a new token and fresh expiration.
+ */
+export async function rotateSession(
+  oldToken: string | undefined,
+  userId: mongoose.Types.ObjectId,
+  clinicId: mongoose.Types.ObjectId,
+  ip?: string,
+  userAgent?: string
+): Promise<{ token: string; session: ISession }> {
+  if (oldToken) {
+    await revokeSession(oldToken);
+  }
+  return createSession(userId, clinicId, ip, userAgent);
 }
 
 /**
@@ -293,6 +311,11 @@ export function withAuth(
 ) {
   return async (req: NextRequest, context?: RouteContext): Promise<NextResponse> => {
     try {
+      const csrfCheck = verifyCsrf(req);
+      if (!csrfCheck.valid) {
+        return NextResponse.json({ error: csrfCheck.error }, { status: 403 });
+      }
+
       let sessionCookie =
         req.cookies?.get(SESSION_COOKIE_NAME)?.value ||
         req.cookies?.get(DEV_SESSION_COOKIE_NAME)?.value;
@@ -355,6 +378,11 @@ export function withAuth(
 export function withKiosk(handler: KioskHandler) {
   return async (req: NextRequest, context?: RouteContext): Promise<NextResponse> => {
     try {
+      const csrfCheck = verifyCsrf(req);
+      if (!csrfCheck.valid) {
+        return NextResponse.json({ error: csrfCheck.error }, { status: 403 });
+      }
+
       let kioskCookie =
         req.cookies?.get(KIOSK_COOKIE_NAME)?.value ||
         req.cookies?.get(DEV_KIOSK_COOKIE_NAME)?.value;
@@ -408,6 +436,11 @@ export function withKiosk(handler: KioskHandler) {
 export function publicRoute(handler: PublicHandler) {
   return async (req: NextRequest, context?: RouteContext): Promise<NextResponse> => {
     try {
+      const csrfCheck = verifyCsrf(req);
+      if (!csrfCheck.valid) {
+        return NextResponse.json({ error: csrfCheck.error }, { status: 403 });
+      }
+
       return await handler(req, context);
     } catch (err: any) {
       console.error('publicRoute error:', err);

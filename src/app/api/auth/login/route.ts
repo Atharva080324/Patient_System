@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { publicRoute, createSession, getSessionCookieName } from '@/lib/auth';
+import { publicRoute, rotateSession, getSessionCookieName } from '@/lib/auth';
 import { User } from '@/models/User';
 import { verifyPassword, dummyVerify } from '@/lib/passwords';
 import { RateLimitRules } from '@/lib/rate-limit';
@@ -100,8 +100,9 @@ export const POST = publicRoute(async (req: NextRequest) => {
     });
   }
 
-  // Issue session
-  const { token } = await createSession(user._id, user.clinicId, ip, userAgent);
+  // Issue rotated session
+  const existingCookie = req.cookies.get(getSessionCookieName())?.value;
+  const { token } = await rotateSession(existingCookie, user._id, user.clinicId, ip, userAgent);
 
   user.lastLoginAt = clock.now();
   await user.save();
