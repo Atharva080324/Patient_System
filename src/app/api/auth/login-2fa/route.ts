@@ -11,6 +11,7 @@ import { assertPlainInput } from '@/lib/validation';
 import { env } from '@/lib/env';
 import { connectDb } from '@/lib/db';
 import { clock } from '@/lib/clock';
+import { systemAdminScope } from '@/lib/tenancy';
 
 const Login2FASchema = z
   .object({
@@ -57,7 +58,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
     );
   }
 
-  const user = await User.findOne({ email });
+  const user = await systemAdminScope(async () => User.findOne({ email }));
   if (!user || !user.totpEnabled || !user.totpSecret) {
     return NextResponse.json({ error: 'Invalid verification code' }, { status: 401 });
   }
@@ -66,19 +67,21 @@ export const POST = publicRoute(async (req: NextRequest) => {
 
   if (isRecoveryCode) {
     const codeHash = hashToken(code.toUpperCase().trim());
-    const updatedUser = await User.findOneAndUpdate(
-      {
-        _id: user._id,
-        'recoveryCodes.hash': codeHash,
-        'recoveryCodes.usedAt': { $exists: false },
-      },
-      {
-        $set: {
-          'recoveryCodes.$.usedAt': clock.now(),
-          lastLoginAt: clock.now(),
+    const updatedUser = await systemAdminScope(async () =>
+      User.findOneAndUpdate(
+        {
+          _id: user._id,
+          'recoveryCodes.hash': codeHash,
+          'recoveryCodes.usedAt': { $exists: false },
         },
-      },
-      { returnDocument: 'after' }
+        {
+          $set: {
+            'recoveryCodes.$.usedAt': clock.now(),
+            lastLoginAt: clock.now(),
+          },
+        },
+        { new: true }
+      )
     );
     if (updatedUser) {
       codeValid = true;

@@ -10,6 +10,7 @@ import { assertPlainInput } from '@/lib/validation';
 import { env } from '@/lib/env';
 import { connectDb } from '@/lib/db';
 import { clock } from '@/lib/clock';
+import { systemAdminScope } from '@/lib/tenancy';
 
 const LoginSchema = z
   .object({
@@ -61,7 +62,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
   }
 
   // Find user across system scope for initial login
-  const user = await User.findOne({ email });
+  const user = await systemAdminScope(async () => User.findOne({ email }));
 
   if (!user) {
     // Constant-time execution to prevent email enumeration
