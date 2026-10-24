@@ -52,3 +52,21 @@ export function recomputeBill(
     status: 'PARTIAL',
   };
 }
+
+/**
+ * Mutates a Bill document using recomputeBill and attaches authorization flag
+ * for the model-level invariant guard.
+ */
+export function applyBillRecompute(
+  bill: any,
+  payments: PaymentRecord[] = [],
+  isCancelled = false
+): { paid: Paise; balance: Paise; status: BillStatus } {
+  const result = recomputeBill(bill.total as Paise, payments, isCancelled);
+  bill.$locals = bill.$locals || {};
+  bill.$locals.allowBillFinancialUpdate = true;
+  bill.paid = result.paid;
+  bill.balance = result.balance;
+  bill.status = result.status;
+  return result;
+}
