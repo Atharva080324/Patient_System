@@ -4,9 +4,9 @@ import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 import { Session, ISession } from '../models/Session';
 import { User, IUser } from '../models/User';
-import { Clinic, IClinic } from '../models/Clinic';
+import { Clinic } from '../models/Clinic';
 import { DeviceToken, IDeviceToken } from '../models/DeviceToken';
-import { hashToken, verifyPassword, hashKioskPin, dummyVerify } from './passwords';
+import { hashToken, verifyPassword, hashKioskPin } from './passwords';
 import { clock } from './clock';
 import { runWithTenantContext, TenantActor, systemScope, systemAdminScope } from './tenancy';
 import { audit } from './audit';
@@ -323,7 +323,7 @@ export function withAuth(
         );
       }
 
-      const { user, session } = authResult;
+      const { user } = authResult;
 
       if (options.roles && !options.roles.includes(user.role)) {
         return NextResponse.json(

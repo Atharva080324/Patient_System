@@ -1,4 +1,4 @@
-import { formatInTimeZone, toDate } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export const CLINIC_TIMEZONE = 'Asia/Kolkata';
 

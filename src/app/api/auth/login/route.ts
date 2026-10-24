@@ -9,6 +9,7 @@ import { AuditAction } from '@/models/AuditLog';
 import { assertPlainInput } from '@/lib/validation';
 import { env } from '@/lib/env';
 import { connectDb } from '@/lib/db';
+import { clock } from '@/lib/clock';
 
 const LoginSchema = z
   .object({
@@ -102,7 +103,7 @@ export const POST = publicRoute(async (req: NextRequest) => {
   // Issue session
   const { token } = await createSession(user._id, user.clinicId, ip, userAgent);
 
-  user.lastLoginAt = new Date();
+  user.lastLoginAt = clock.now();
   await user.save();
 
   await audit.record({
