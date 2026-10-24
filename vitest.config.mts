@@ -20,18 +20,23 @@ export default defineConfig({
         'src/lib/tenancy.ts',
         'src/lib/rate-limit.ts',
         'src/lib/auth.ts',
+        'src/lib/passwords.ts',
+        'src/lib/totp.ts',
+        'src/lib/qr.ts',
+        'src/lib/csrf.ts',
       ],
       thresholds: {
-        statements: 90,
-        branches: 85,
-        functions: 90,
+        perFile: true,
         lines: 90,
+        functions: 90,
+        branches: 90,
+        statements: 90,
       },
     },
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, './src'),
+      '@': path.resolve(import.meta.dirname, './src'),
     },
   },
 });
