@@ -5,6 +5,7 @@ import { Clinic } from '@/models/Clinic';
 import { assertPlainInput } from '@/lib/validation';
 import { connectDb } from '@/lib/db';
 import { env } from '@/lib/env';
+import { verifyCsrf } from '@/lib/csrf';
 
 const KioskUnlockSchema = z
   .object({

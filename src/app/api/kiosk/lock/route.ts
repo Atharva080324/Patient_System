@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withKiosk, getKioskCookieName } from '@/lib/auth';
 import { clock } from '@/lib/clock';
+import { verifyCsrf } from '@/lib/csrf';
 
 export const POST = withKiosk(async (req: NextRequest, device) => {
   device.revokedAt = clock.now();
