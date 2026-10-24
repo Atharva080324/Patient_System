@@ -87,3 +87,69 @@
 - **Day Boundary:** Evaluated from `00:00:00.000` to `23:59:59.999` in Asia/Kolkata using `startOfClinicDay` and `endOfClinicDay`.
 - **Reconciliation:** All numbers (registered, completed, skipped, no-show, cancelled, waiting) match raw MongoDB count of visits for the specified clinic day.
 
+---
+
+# Phase 3: Consultation, Case Sheet & Prescription Assumptions
+
+## 1. Case Sheet Data Model & Optimistic Concurrency Versioning
+- **Collection & Isolation:** Case sheet is stored in a dedicated `CaseSheet` collection with a unique compound index `{ clinicId: 1, visitId: 1 }`.
+- **Versioning (`version`):**
+  - Starts at `1` upon creation.
+  - Every update must supply the `version` on which the edit was based.
+  - Updates use atomic `findOneAndUpdate({ clinicId, visitId, version: incomingVersion }, { $set: changedFields, $inc: { version: 1 } })`.
+  - If another session updated the case sheet in between, the filter fails to match and returns HTTP `409 Conflict`.
+  - The client UI intercepts `409 Conflict`, retains the doctor's locally typed text, displays an explicit conflict alert with "Reload Latest" and "Copy My Text", ensuring zero typed data is ever lost or silently overwritten.
+- **Autosave & Field-Level Audit:**
+  - Client debounces autosave (1.5 seconds) while typing.
+  - Only changed fields are transmitted and updated.
+  - Audit logging (`CASE_SHEET_UPDATE`) records entity IDs and field *names* only (e.g. `['chiefComplaint', 'diagnosis']`), never clinical values or PII.
+
+## 2. Prescription Lifecycle, Immutability & Correction Model
+- **States:**
+  - `DRAFT`: Editable, autosaved, no prescription number assigned yet.
+  - `ISSUED`: Numbered with gapless `RX/FY/0001` allocated atomically within the issue transaction. Immutable; all fields frozen in snapshot.
+  - `VOID`: Voided with a mandatory doctor-provided `voidReason`. Never deleted from database.
+- **Strict Immutability Invariant:**
+  - Once a prescription transitions to `ISSUED`, any further update to medicine lines, dose, frequency, duration, or advice is strictly forbidden and rejected at the model/service level.
+- **Correction Workflow:**
+  - To correct an issued prescription, the doctor voids the old prescription specifying a reason (`voidReason`, `voidedAt`, `voidedBy`).
+  - A new prescription is created with `replacesPrescriptionId: oldPrescription._id`.
+  - Both prescriptions remain permanently in the database for legal/compliance integrity. RX numbers are never reused or gapped.
+- **Gapless Sequence Integrity:**
+  - Allocated via `getNextSequenceValue(clinicId, 'rx', session)` within a MongoDB multi-document transaction. If any part of the issue fails, the transaction aborts and the counter rolls back with no gap.
+
+## 3. Print Snapshot Design (Issue-Time Freezing)
+- At the exact moment a prescription is transitioned from `DRAFT` to `ISSUED`, a complete `snapshot` is frozen:
+  - `clinic`: name, address, phone, email, registrationNo, logoUrl, workingHours.
+  - `doctor`: name, qualification, registrationNo (from clinic/user record).
+  - `patient`: name, ageYears, sex, patientCode, phone, address.
+  - `date`: clinic date string in `Asia/Kolkata`.
+  - `items`: exact medicine lines (genericName, brandName, form, strength, dose, frequency, duration, instructions, note).
+  - `advice` & `followUpDate`.
+  - `language`: active prescription language setting ('en' | 'hi' | 'mr').
+- All subsequent print requests (`/print/prescription/[id]`) render strictly from this frozen snapshot. Future changes to patient demographic data or clinic letterhead never alter an issued prescription.
+- Reprints are audited (`PRESCRIPTION_PRINT`) and display a subtle "Reprint" indicator after the first print. Voided prescriptions display a prominent diagonal "VOID" watermark.
+
+## 4. Medicine Search, Favourites & Custom Medicine Invariants
+- **No AI / No Suggestion Invariant:**
+  - The system NEVER suggests drugs, dosages, frequencies, durations, or drug-drug interactions. The doctor has complete clinical autonomy.
+  - The medicine combobox only displays `genericName`, `brandName`, `form`, `strength`, and a `verified` badge.
+- **Search Strategy & Performance:**
+  - Optimized prefix matching with MongoDB compound index `{ clinicId: 1, active: 1, genericName: 1 }` and text index.
+  - Performance requirement: p95 response time < 50ms across 5,000 seeded items.
+- **Doctor Favourites & Custom Medicines:**
+  - Doctor can mark medicines as favorite (`isFavorite: true` or high usage count in `DoctorMedicine`). Favourites appear first when combobox opens empty.
+  - Doctor can add custom medicines owned by the clinic (`source: 'CUSTOM'`), preventing case-insensitive duplicates. Custom medicines can be deactivated (`active: false`), never deleted.
+
+## 5. FDI Tooth Notation & Server-Side Validation
+- **Standard:** FDI Two-Digit World Dental Federation notation.
+- **Valid Teeth:**
+  - Permanent (Adult): `11`..`18`, `21`..`28`, `31`..`38`, `41`..`48` (32 teeth).
+  - Primary (Deciduous): `51`..`55`, `61`..`65`, `71`..`75`, `81`..`85` (20 teeth).
+- **Validation:** Validated both on client UI and server schema/service via `isValidFdiTooth(number)`. Any out-of-range number is rejected with HTTP `400 Bad Request`.
+- **Pure Recording:** Tooth selection records findings/notes only. No automatic diagnoses or treatment auto-assignments.
+
+## 6. Allergy Chip Invariant
+- Purely a visual reminder chip displaying patient allergies entered by the doctor.
+- Strictly informational: does NOT inspect drugs, does NOT block prescription creation or issuing.
+
