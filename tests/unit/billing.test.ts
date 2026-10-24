@@ -89,8 +89,8 @@ describe('Billing Primitives (recomputeBill)', () => {
         items: [{ description: 'Scaling', qty: 1, unitPrice: 100000, amount: 100000 }],
         discount: 0,
         total: 100000,
-        paid: 50000, // illegally set arbitrary paid
-        balance: 50000,
+        paid: 50000, // illegally set arbitrary paid/balance
+        balance: 20000, // 50000 + 20000 != 100000 (violates recomputeBill invariant)
         status: 'UNPAID',
         createdBy: { type: 'USER', id: 'doc_1' },
       });

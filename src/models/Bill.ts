@@ -86,7 +86,8 @@ BillSchema.pre('validate', function () {
 
   if (this.isNew) {
     if (!isAllowed) {
-      const computed = recomputeBill(this.total as any, [], this.status === 'CANCELLED');
+      const virtualPayments = this.paid > 0 ? [{ amount: this.paid as any }] : [];
+      const computed = recomputeBill(this.total as any, virtualPayments, this.status === 'CANCELLED');
       if (this.paid !== computed.paid || this.balance !== computed.balance) {
         throw new Error(
           'Invariant violation: bill.paid and bill.balance can only be set via recomputeBill'
