@@ -78,10 +78,19 @@ Every document contains:
   - `{ clinicId: 1, source: 1, externalId: 1 }` (unique, sparse)
 
 ### `visits`
-- Fields: `clinicId`, `patientId`, `doctorId`, `date` (YYYY-MM-DD), `token` (integer), `chiefComplaints`, `findings`, `diagnoses`, `vitals?`, `status` (WAITING/IN_PROGRESS/COMPLETED)
+- Fields: `clinicId`, `patientId`, `date` (YYYY-MM-DD), `token` (integer), `type` (WALK_IN/APPOINTMENT), `status` (WAITING/IN_CONSULTATION/COMPLETED/SKIPPED/NO_SHOW/CANCELLED), `checkInAt`, `startedAt?`, `completedAt?`, `skippedAt?`, `noShowAt?`, `cancelledAt?`, `reasonForVisit`, `caseSheet`, `version`, `createdBy`
+- Invariants: Only ONE visit per clinic can be `IN_CONSULTATION` at any time (enforced via partial unique index). Terminal states (`COMPLETED`, `NO_SHOW`, `CANCELLED`) cannot transition.
 - Indexes:
   - `{ clinicId: 1, date: 1, token: 1 }` (unique)
   - `{ clinicId: 1, patientId: 1, date: 1 }`
+  - `{ clinicId: 1, status: 1 }` (unique, partial: `{ status: 'IN_CONSULTATION' }`)
+
+### `idempotencyKeys`
+- Fields: `clinicId`, `key`, `status` (PROCESSING/COMPLETED), `response?`, `createdAt`
+- Invariants: Guarantees at-most-once registration execution under high concurrency.
+- Indexes:
+  - `{ clinicId: 1, key: 1 }` (unique)
+  - `{ createdAt: 1 }` (TTL: 86400 seconds / 24 hours)
 
 ### `medicines` & `doctorMedicines`
 - Fields: `clinicId`, `genericName`, `brandName?`, `form` (TABLET/CAPSULE/SYRUP/GEL/MOUTHWASH/INJECTION/DROPS), `strength`, `route` (ORAL/TOPICAL/SUBLINGUAL/INFILTRATION), `category`, `source` (SAMPLE/DOCTOR/SYSTEM), `verified` (boolean), `active` (boolean)
