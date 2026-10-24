@@ -10,7 +10,7 @@ import {
 import { VisitAction } from '@/lib/visit-state-machine';
 import { assertPlainInput } from '@/lib/validation';
 
-export const POST = withAuth(async (req: NextRequest, session, context?: any) => {
+export const POST = withAuth(async (req: NextRequest, auth, context?: any) => {
   const params = context?.params ? await context.params : {};
   const visitId = params.id;
   if (!visitId) {
@@ -40,11 +40,11 @@ export const POST = withAuth(async (req: NextRequest, session, context?: any) =>
 
   try {
     const updatedVisit = await transitionVisitStatus(
-      session.clinicId,
+      auth.session.clinicId,
       visitId,
       action as VisitAction,
       expectedVersion,
-      { type: 'USER', id: session.userId.toString() }
+      { type: 'USER', id: auth.user._id.toString() }
     );
 
     return NextResponse.json({

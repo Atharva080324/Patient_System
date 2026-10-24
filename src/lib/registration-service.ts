@@ -149,7 +149,7 @@ export async function registerWalkInPatient(
     }
 
     // 5. Execute atomic creation inside transaction
-    let createdVisitId: Types.ObjectId | null = null;
+    let createdVisitId: any = null;
 
     await withTransaction(async (session) => {
       if (options.injectFailure === 'PATIENT_CREATION') {

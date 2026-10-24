@@ -4,7 +4,7 @@ import { Clinic } from '../src/models/Clinic';
 import { Treatment, TreatmentUnit } from '../src/models/Treatment';
 import { Medicine, MedicineForm } from '../src/models/Medicine';
 import { systemScope } from '../src/lib/tenancy';
-import { hashPassword } from '../src/lib/passwords';
+import { hashKioskPin } from '../src/lib/passwords';
 
 interface IDATreatmentDef {
   code: string;
@@ -66,7 +66,7 @@ async function main() {
   let clinic = await Clinic.findOne();
   if (!clinic) {
     console.log('No clinic found. Creating default clinic for base seed...');
-    const pinHash = await hashPassword('1234');
+    const pinHash = await hashKioskPin('1234');
     clinic = await Clinic.create({
       name: "Dr. Susheel's Advanced Dental Clinic & Implant Center",
       address: 'Shop No 1-4, First Floor, City Pride Complex, Jalna Road, Chhatrapati Sambhajinagar, Maharashtra 431001',
@@ -138,9 +138,7 @@ async function main() {
   console.log('Base seed completed successfully.');
 }
 
-if (require.main === module) {
-  main().catch((err) => {
-    console.error('Fatal error during base seed:', err);
-    process.exit(1);
-  });
-}
+main().catch((err) => {
+  console.error('Fatal error during base seed:', err);
+  process.exit(1);
+});

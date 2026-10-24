@@ -5,20 +5,20 @@ import { AuditLog, AuditAction } from '@/models/AuditLog';
 import { clock } from '@/lib/clock';
 import { clinicDate } from '@/lib/date';
 
-export const GET = withAuth(async (req: NextRequest, session) => {
+export const GET = withAuth(async (req: NextRequest, auth) => {
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date') || clinicDate(clock.now());
 
-  const report = await generateClosingReport(session.clinicId, dateParam);
+  const report = await generateClosingReport(auth.session.clinicId, dateParam);
 
   await AuditLog.create({
-    clinicId: session.clinicId,
-    actor: { type: 'USER', id: session.userId.toString() },
+    clinicId: auth.session.clinicId,
+    actor: { type: 'USER', id: auth.user._id.toString() },
     action: AuditAction.CLOSING_REPORT_VIEW,
     entity: 'ClosingReport',
     entityId: dateParam,
     at: clock.now(),
-    createdBy: { type: 'USER', id: session.userId.toString() },
+    createdBy: { type: 'USER', id: auth.user._id.toString() },
   });
 
   return NextResponse.json({

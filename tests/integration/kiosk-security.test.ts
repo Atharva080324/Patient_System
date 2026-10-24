@@ -50,7 +50,6 @@ describe('B3 & Privacy: Kiosk Read-Attempt Attack Matrix & CSRF/Rate-Limit Secur
       email: 'dr.susheel@example.com',
       registrationNo: 'REG-123456',
       kioskPinHash: pinHash,
-      active: true,
       schemaVersion: 1,
       createdBy: { type: 'SYSTEM', id: 'setup' },
     });
