@@ -162,7 +162,9 @@ async function main() {
   console.log('Base seed completed successfully.');
 }
 
-main().catch((err) => {
-  console.error('Fatal error during base seed:', err);
-  process.exit(1);
-});
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').includes('scripts/seed-base')) {
+  main().catch((err) => {
+    console.error('Fatal error during base seed:', err);
+    process.exit(1);
+  });
+}

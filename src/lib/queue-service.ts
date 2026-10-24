@@ -86,9 +86,11 @@ export async function getLiveQueue(
       .select('token status checkInAt startedAt reasonForVisit type version patientId')
       .populate({
         path: 'patientId',
+        model: Patient,
         select: 'name ageYears dob sex possibleDuplicateOf',
         populate: {
           path: 'possibleDuplicateOf',
+          model: Patient,
           select: 'patientCode',
         },
       })

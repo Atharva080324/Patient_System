@@ -256,7 +256,7 @@ export function ClosingReportClient() {
             <div className="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm grid grid-cols-1 md:grid-cols-3 gap-6 print:border-slate-300">
               {/* Average Wait Time */}
               <div className="border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1">
                   Average Wait Time
                 </span>
                 <div
@@ -264,16 +264,16 @@ export function ClosingReportClient() {
                   className="text-3xl font-extrabold text-slate-900 font-mono"
                 >
                   {report.averageWaitMinutes}{' '}
-                  <span className="text-base font-medium text-slate-500">mins</span>
+                  <span className="text-base font-medium text-slate-600">mins</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 mt-1">
                   From kiosk check-in to consultation start
                 </p>
               </div>
 
               {/* Longest Wait Time */}
               <div className="border-b md:border-b-0 md:border-r border-slate-100 pb-4 md:pb-0 md:pr-6">
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1">
                   Longest Wait Time
                 </span>
                 <div
@@ -281,16 +281,16 @@ export function ClosingReportClient() {
                   className="text-3xl font-extrabold text-slate-900 font-mono"
                 >
                   {report.longestWaitMinutes}{' '}
-                  <span className="text-base font-medium text-slate-500">mins</span>
+                  <span className="text-base font-medium text-slate-600">mins</span>
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 mt-1">
                   Maximum wait recorded today
                 </p>
               </div>
 
               {/* Token Range */}
               <div>
-                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 block mb-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-600 block mb-1">
                   Token Allocation Range
                 </span>
                 <div
@@ -301,7 +301,7 @@ export function ClosingReportClient() {
                   {' → '}
                   {report.lastToken !== null ? `#${report.lastToken}` : 'None'}
                 </div>
-                <p className="text-xs text-slate-400 mt-1">
+                <p className="text-xs text-slate-600 mt-1">
                   Sequential tokens issued on {selectedDate}
                 </p>
               </div>
@@ -344,7 +344,7 @@ export function ClosingReportClient() {
                     </strong>
                     . Zero discrepancies found across clinical clinic day boundaries.
                   </p>
-                  <p className="text-[11px] text-slate-400 pt-1 font-mono">
+                  <p className="text-[11px] text-slate-600 pt-1 font-mono">
                     Audit Log Entry: CLOSING_REPORT_VIEW recorded for date {selectedDate}.
                   </p>
                 </div>

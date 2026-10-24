@@ -54,6 +54,32 @@ export async function rateLimit(
   };
 }
 
+export async function checkRateLimit(
+  key: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  const now = clock.now();
+  const nowMs = now.getTime();
+  const windowMs = windowSeconds * 1000;
+  const windowStartMs = Math.floor(nowMs / windowMs) * windowMs;
+  const windowEndMs = windowStartMs + windowMs;
+  const docId = `${key}:${windowStartMs}`;
+
+  const doc = await RateLimit.findById(docId);
+  const count = doc ? doc.count : 0;
+  const allowed = count < limit;
+  const remaining = Math.max(0, limit - count);
+  const retryAfterSeconds = Math.max(1, Math.ceil((windowEndMs - nowMs) / 1000));
+
+  return {
+    allowed,
+    count,
+    remaining,
+    retryAfterSeconds,
+  };
+}
+
 /**
  * Standard rate limiting presets per specification:
  * - Login failures: 5 per email per 15 min, 20 per IP per 15 min
@@ -61,6 +87,13 @@ export async function rateLimit(
  * - Default API: 120 per minute per IP
  */
 export const RateLimitRules = {
+  checkLoginEmailFailure: (email: string) => checkRateLimit(`login:email:fail:${email.toLowerCase()}`, 5, 15 * 60),
+  checkLoginIpFailure: (ip: string) => checkRateLimit(`login:ip:fail:${ip}`, 20, 15 * 60),
+  recordLoginEmailFailure: (email: string) => rateLimit(`login:email:fail:${email.toLowerCase()}`, 5, 15 * 60),
+  recordLoginIpFailure: (ip: string) => rateLimit(`login:ip:fail:${ip}`, 20, 15 * 60),
+  clearLoginEmailFailure: async (email: string) => {
+    await RateLimit.deleteMany({ key: `login:email:fail:${email.toLowerCase()}` });
+  },
   loginEmailFailure: (email: string) => rateLimit(`login:email:fail:${email.toLowerCase()}`, 5, 15 * 60),
   loginIpFailure: (ip: string) => rateLimit(`login:ip:fail:${ip}`, 20, 15 * 60),
   kioskUnlockIp: (ip: string) => rateLimit(`kiosk:unlock:${ip}`, 5, 15 * 60),

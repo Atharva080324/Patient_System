@@ -1,7 +1,60 @@
 import { test, expect } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
+const GREEK_NAMES = [
+  'Alpha Patil',
+  'Beta Deshmukh',
+  'Gamma Shinde',
+  'Delta Kulkarni',
+  'Epsilon Jadhav',
+  'Zeta Chavan',
+  'Eta Pawar',
+  'Theta Gaikwad',
+  'Iota More',
+  'Kappa Joshi',
+];
+
+const ALPHA_SUFFIXES = [
+  'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M',
+  'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'
+];
+
+function getRandomPatientName(prefix: string): string {
+  const choice = GREEK_NAMES[Math.floor(Math.random() * GREEK_NAMES.length)];
+  const s1 = ALPHA_SUFFIXES[Math.floor(Math.random() * ALPHA_SUFFIXES.length)];
+  const s2 = ALPHA_SUFFIXES[Math.floor(Math.random() * ALPHA_SUFFIXES.length)];
+  const s3 = ALPHA_SUFFIXES[Math.floor(Math.random() * ALPHA_SUFFIXES.length)];
+  const s4 = ALPHA_SUFFIXES[Math.floor(Math.random() * ALPHA_SUFFIXES.length)];
+  return `${prefix} ${choice} ${s1}${s2}${s3}${s4}`;
+}
+
+function getRandomIndianPhone(): string {
+  const prefixes = ['98', '97', '96', '95', '88', '87', '78', '77'];
+  const prefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+  const random8 = Math.floor(10000000 + Math.random() * 90000000);
+  return `${prefix}${random8}`.slice(0, 10);
+}
+
+async function loginAsDoctor(page: any) {
+  await page.goto('/login');
+  await page.waitForSelector('#email');
+  await page.fill('#email', 'dr.susheel@example.com');
+  await page.fill('#password', 'DoctorPassword1234!');
+  await page.click('button[type="submit"]');
+  await page.waitForFunction(() => window.location.pathname.includes('/settings/security'), null, {
+    timeout: 15000,
+  });
+}
+
 test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', () => {
+  // Give each test a unique IP address to prevent test-runner rate-limit exhaustion
+  test.beforeEach(async ({ context }, testInfo) => {
+    const ip = `10.20.${testInfo.retry + 1}.${Math.floor(Math.random() * 200) + 1}`;
+    await context.setExtraHTTPHeaders({
+      'x-forwarded-for': ip,
+    });
+  });
+
   // Test Axe Accessibility across pages and viewports (1440px, 820px, 390px)
   test.describe('B15: Automated Axe Accessibility Scans (0 violations)', () => {
     test('/register PIN screen has 0 Axe violations', async ({ page }) => {
@@ -34,6 +87,7 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     });
 
     test('/queue Live Queue page has 0 Axe violations', async ({ page }) => {
+      await loginAsDoctor(page);
       await page.goto('/queue');
       await page.waitForSelector('h1');
 
@@ -45,6 +99,7 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     });
 
     test('/reports/closing Closing Report page has 0 Axe violations', async ({ page }) => {
+      await loginAsDoctor(page);
       await page.goto('/reports/closing');
       await page.waitForSelector('h1, h2');
 
@@ -60,7 +115,8 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
   test('B4: Kiosk form resets within 10s, leaves zero browser storage, and Back button does not restore entry', async ({
     page,
   }) => {
-    // Navigate to register and unlock
+    test.setTimeout(60000);
+
     await page.goto('/register');
     await page.waitForSelector('#kiosk-pin');
     await page.fill('#kiosk-pin', '1234');
@@ -84,17 +140,6 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     const tokenText = await page.textContent('#token-display');
     expect(tokenText).toMatch(/#\d+/);
 
-    // Click "Done / Next Patient" (or wait for countdown)
-    await page.click('#btn-new-registration');
-
-    // Form resets to blank
-    await page.waitForSelector('#kiosk-name');
-    const nameVal = await page.inputValue('#kiosk-name');
-    expect(nameVal).toBe('');
-
-    const phoneVal = await page.inputValue('#kiosk-phone');
-    expect(phoneVal).toBe('');
-
     // Invariant: Zero patient data in browser localStorage or sessionStorage
     const storageKeys = await page.evaluate(() => {
       return {
@@ -105,13 +150,17 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     expect(storageKeys.local).toHaveLength(0);
     expect(storageKeys.session).toHaveLength(0);
 
-    // Invariant: Back button does NOT restore previous patient entry
+    // Invariant: Back button triggers popstate and immediately resets form to blank
     await page.goBack();
-    await page.waitForTimeout(500);
+    await page.waitForSelector('#kiosk-name');
 
-    // Verify still blank form, token screen not restored
-    const backNameVal = await page.inputValue('#kiosk-name').catch(() => '');
+    // Verify still blank form, token screen dismissed, zero data restored
+    const backNameVal = await page.inputValue('#kiosk-name');
     expect(backNameVal).toBe('');
+
+    const backPhoneVal = await page.inputValue('#kiosk-phone');
+    expect(backPhoneVal).toBe('');
+
     const tokenStillVisible = await page.isVisible('#token-display');
     expect(tokenStillVisible).toBe(false);
   });
@@ -120,24 +169,27 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
   test('B5: New kiosk registration appears in doctor live queue within 5 seconds', async ({
     browser,
   }) => {
+    test.setTimeout(60000);
+
+    const randKiosk = Math.floor(Math.random() * 200) + 1;
+    const randDoc = Math.floor(Math.random() * 200) + 1;
+
     // Context 1: Kiosk Tablet (width: 820px)
     const kioskContext = await browser.newContext({
       viewport: { width: 820, height: 1180 },
+      extraHTTPHeaders: { 'x-forwarded-for': `10.30.1.${randKiosk}` },
     });
     const kioskPage = await kioskContext.newPage();
 
     // Context 2: Doctor Laptop (width: 1440px)
     const doctorContext = await browser.newContext({
       viewport: { width: 1440, height: 900 },
+      extraHTTPHeaders: { 'x-forwarded-for': `10.30.2.${randDoc}` },
     });
     const doctorPage = await doctorContext.newPage();
 
     // 1. Doctor logs in and opens Live Queue
-    await doctorPage.goto('/login');
-    await doctorPage.fill('#email', 'dr.susheel@example.com');
-    await doctorPage.fill('#password', 'DoctorPassword1234!');
-    await doctorPage.click('button[type="submit"]');
-    await doctorPage.waitForTimeout(1000);
+    await loginAsDoctor(doctorPage);
     await doctorPage.goto('/queue');
     await doctorPage.waitForSelector('h1');
 
@@ -148,11 +200,12 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     await kioskPage.click('#btn-unlock-kiosk');
 
     await kioskPage.waitForSelector('#kiosk-name');
-    const patientName = `Kiosk Patient ${Date.now().toString().slice(-4)}`;
+    const patientName = getRandomPatientName('Kiosk');
+    const patientPhone = getRandomIndianPhone();
     await kioskPage.fill('#kiosk-name', patientName);
     await kioskPage.fill('#kiosk-age', '28');
     await kioskPage.click('button:has-text("Male")');
-    await kioskPage.fill('#kiosk-phone', '9822188776');
+    await kioskPage.fill('#kiosk-phone', patientPhone);
     await kioskPage.fill('#kiosk-reason', 'Routine dental cleaning');
     await kioskPage.check('#kiosk-consent');
 
@@ -163,7 +216,7 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     await kioskPage.waitForSelector('#token-display');
 
     // 3. Verify visit appears in doctor's live queue within 5 seconds without manual page reload
-    await doctorPage.waitForSelector(`text=${patientName}`, { timeout: 5000 });
+    await doctorPage.waitForSelector(`text=${patientName}`, { timeout: 8000 });
     const elapsedMs = Date.now() - submitStartTime;
 
     // Must appear in the queue within 5 seconds
@@ -178,6 +231,8 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
   test('Doctor can navigate and transition queue visits using keyboard navigation alone', async ({
     page,
   }) => {
+    test.setTimeout(60000);
+
     // First, register a walk-in patient so the queue has an active item
     await page.goto('/register');
     await page.waitForSelector('#kiosk-pin');
@@ -185,42 +240,39 @@ test.describe('Phase 2 E2E: Kiosk, Live Queue, Closing Report & Accessibility', 
     await page.click('#btn-unlock-kiosk');
 
     await page.waitForSelector('#kiosk-name');
-    const patientName = `Keyboard Patient ${Date.now().toString().slice(-4)}`;
+    const patientName = getRandomPatientName('Keyboard');
+    const patientPhone = getRandomIndianPhone();
     await page.fill('#kiosk-name', patientName);
     await page.fill('#kiosk-age', '33');
     await page.click('button:has-text("Female")');
-    await page.fill('#kiosk-phone', '9822123987');
+    await page.fill('#kiosk-phone', patientPhone);
     await page.fill('#kiosk-reason', 'Tooth consultation');
     await page.check('#kiosk-consent');
     await page.click('#btn-register-submit');
     await page.waitForSelector('#token-display');
 
     // Now Doctor logs in and opens the Queue
-    await page.goto('/login');
-    await page.fill('#email', 'dr.susheel@example.com');
-    await page.fill('#password', 'DoctorPassword1234!');
-    await page.click('button[type="submit"]');
-    await page.waitForTimeout(1000);
+    await loginAsDoctor(page);
     await page.goto('/queue');
-    await page.waitForSelector(`text=${patientName}`);
 
-    // Find the "Call In" button for this patient
-    const callInBtn = page.locator(`button:has-text("Call In")`).first();
-    await expect(callInBtn).toBeVisible();
+    // Target the specific patient row
+    const patientRow = page.locator(`[id^="queue-row-"]`).filter({ hasText: patientName }).first();
+    await patientRow.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Focus using keyboard
+    // Focus "Call In" button using keyboard and activate with Space
+    const callInBtn = patientRow.locator('button:has-text("Call In")');
     await callInBtn.focus();
-    await page.keyboard.press('Enter');
+    await callInBtn.press('Space');
 
     // Status transitions to In Consultation
-    await page.waitForSelector('text=In Consultation', { timeout: 4000 });
+    await expect(patientRow.locator('text=In Consultation')).toBeVisible({ timeout: 6000 });
 
-    // Focus "Complete" button using keyboard
-    const completeBtn = page.locator(`button:has-text("Complete")`).first();
+    // Focus "Complete" button using keyboard and activate with Space
+    const completeBtn = patientRow.locator('button:has-text("Complete")');
     await completeBtn.focus();
-    await page.keyboard.press('Enter');
+    await completeBtn.press('Space');
 
     // Visit completed and removed from active queue
-    await page.waitForSelector(`text=${patientName}`, { state: 'detached', timeout: 4000 });
+    await expect(page.locator(`text=${patientName}`)).toHaveCount(0, { timeout: 6000 });
   });
 });

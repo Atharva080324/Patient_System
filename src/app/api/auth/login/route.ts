@@ -44,9 +44,9 @@ export const POST = publicRoute(async (req: NextRequest) => {
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() || '127.0.0.1';
   const userAgent = req.headers.get('user-agent') || 'Unknown';
 
-  // Rate limit checks
-  const emailLimit = await RateLimitRules.loginEmailFailure(email);
-  const ipLimit = await RateLimitRules.loginIpFailure(ip);
+  // Rate limit checks (threshold inspection without counting success as failure)
+  const emailLimit = await RateLimitRules.checkLoginEmailFailure(email);
+  const ipLimit = await RateLimitRules.checkLoginIpFailure(ip);
 
   if (!emailLimit.allowed || !ipLimit.allowed) {
     const retryAfter = Math.max(emailLimit.retryAfterSeconds, ipLimit.retryAfterSeconds);
@@ -65,6 +65,8 @@ export const POST = publicRoute(async (req: NextRequest) => {
   const user = await systemAdminScope(async () => User.findOne({ email }));
 
   if (!user) {
+    await RateLimitRules.recordLoginEmailFailure(email);
+    await RateLimitRules.recordLoginIpFailure(ip);
     // Constant-time execution to prevent email enumeration
     await dummyVerify(password);
 
@@ -76,6 +78,8 @@ export const POST = publicRoute(async (req: NextRequest) => {
 
   const passwordValid = await verifyPassword(user.passwordHash, password);
   if (!passwordValid) {
+    await RateLimitRules.recordLoginEmailFailure(email);
+    await RateLimitRules.recordLoginIpFailure(ip);
     await audit.record({
       clinicId: user.clinicId,
       action: AuditAction.AUTH_FAIL,
@@ -92,6 +96,9 @@ export const POST = publicRoute(async (req: NextRequest) => {
       { status: 401 }
     );
   }
+
+  // Clear failure counter on successful password verification
+  await RateLimitRules.clearLoginEmailFailure(email);
 
   // If 2FA is enabled, do not issue session yet
   if (user.totpEnabled) {

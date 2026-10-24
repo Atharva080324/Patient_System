@@ -223,6 +223,9 @@ export function KioskClient({ initialUnlocked }: KioskClientProps) {
       const data = await res.json().catch(() => ({}));
 
       if (res.ok && data.success) {
+        if (typeof window !== 'undefined') {
+          window.history.pushState({ step: 'token' }, '', '/register#token');
+        }
         setTokenResult(data.token);
       } else {
         setFormError(data.error || 'Failed to complete registration. Please speak to clinic reception.');

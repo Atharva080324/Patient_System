@@ -45,7 +45,7 @@ export function QueueClient() {
   const [conflictAlert, setConflictAlert] = useState<string | null>(null);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
-  const pollIntervalRef = useRef<number>(4000);
+  const pollIntervalRef = useRef<number>(2000);
   const pollTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchQueue = useCallback(async (isInitial = false) => {
@@ -56,9 +56,9 @@ export function QueueClient() {
         setCounters(data.counters);
         setItems(data.items);
         setLastUpdated(clock.now());
-        pollIntervalRef.current = 4000; // Reset backoff on success
+        pollIntervalRef.current = 2000; // Reset backoff on success
       } else {
-        // Backoff on error
+        // Backoff on error or unauthorized
         pollIntervalRef.current = Math.min(pollIntervalRef.current * 2, 30000);
       }
     } catch {

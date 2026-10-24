@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
 import { getLiveQueue } from '@/lib/queue-service';
 import { AuditLog, AuditAction } from '@/models/AuditLog';
+import { Patient } from '@/models/Patient';
+import { Visit } from '@/models/Visit';
 import { clock } from '@/lib/clock';
 import { clinicDate } from '@/lib/date';
+import { connectDb } from '@/lib/db';
 
 export const GET = withAuth(async (req: NextRequest, auth) => {
+  await connectDb();
   const url = new URL(req.url);
   const dateParam = url.searchParams.get('date') || clinicDate(clock.now());
 

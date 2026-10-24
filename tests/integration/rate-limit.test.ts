@@ -81,4 +81,42 @@ describe('MongoDB-Backed Fixed Window Rate Limiting', () => {
     expect(apiRes.allowed).toBe(true);
     expect(apiRes.remaining).toBe(119); // limit is 120
   });
+
+  it('checks rate limits non-mutatingly and handles clearing failures', async () => {
+    const email = 'doctor.nonmutating@test.com';
+    const ip = '192.168.1.200';
+
+    // 1. Initial check: count is 0, allowed is true, remaining is 5
+    const initialCheck = await RateLimitRules.checkLoginEmailFailure(email);
+    expect(initialCheck.allowed).toBe(true);
+    expect(initialCheck.count).toBe(0);
+    expect(initialCheck.remaining).toBe(5);
+
+    const initialIp = await RateLimitRules.checkLoginIpFailure(ip);
+    expect(initialIp.allowed).toBe(true);
+    expect(initialIp.count).toBe(0);
+    expect(initialIp.remaining).toBe(20);
+
+    // 2. Record failures
+    for (let i = 1; i <= 5; i++) {
+      const rec = await RateLimitRules.recordLoginEmailFailure(email);
+      expect(rec.count).toBe(i);
+    }
+    await RateLimitRules.recordLoginIpFailure(ip);
+
+    // 3. Inspection after 5 failures: check rate limit shows blocked
+    const blockedCheck = await RateLimitRules.checkLoginEmailFailure(email);
+    expect(blockedCheck.allowed).toBe(false);
+    expect(blockedCheck.count).toBe(5);
+    expect(blockedCheck.remaining).toBe(0);
+
+    // 4. Clear email failures (e.g. after successful login)
+    await RateLimitRules.clearLoginEmailFailure(email);
+
+    // 5. Check again: should be allowed with 0 count
+    const clearedCheck = await RateLimitRules.checkLoginEmailFailure(email);
+    expect(clearedCheck.allowed).toBe(true);
+    expect(clearedCheck.count).toBe(0);
+    expect(clearedCheck.remaining).toBe(5);
+  });
 });
