@@ -244,7 +244,7 @@ export async function transitionVisitStatus(
         version: expectedVersion,
       },
       updateDoc,
-      { new: true }
+      { returnDocument: 'after' }
     );
 
     if (!updated) {
