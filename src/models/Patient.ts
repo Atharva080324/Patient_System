@@ -13,6 +13,7 @@ export interface IPatient extends Document {
   clinicId: mongoose.Types.ObjectId;
   patientCode: string;
   name: string;
+  searchName: string;
   ageYears?: number;
   dob?: string; // YYYY-MM-DD
   sex: 'Male' | 'Female' | 'Other';
@@ -23,8 +24,11 @@ export interface IPatient extends Document {
   consentAt: Date;
   consentTextVersion: string;
   notes?: string;
+  generalNotes?: string;
   possibleDuplicateOf?: mongoose.Types.ObjectId;
+  duplicateDismissed?: boolean;
   deletedAt?: Date;
+  version: number;
   schemaVersion: number;
   createdBy: TenantActor;
   createdAt: Date;
@@ -36,6 +40,7 @@ const PatientSchema = new Schema<IPatient>(
     clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true, index: true },
     patientCode: { type: String, required: true },
     name: { type: String, required: true, trim: true },
+    searchName: { type: String, required: true, trim: true, lowercase: true, index: true },
     ageYears: { type: Number, min: 0, max: 120 },
     dob: { type: String },
     sex: { type: String, enum: ['Male', 'Female', 'Other'], required: true },
@@ -57,8 +62,11 @@ const PatientSchema = new Schema<IPatient>(
     consentAt: { type: Date, required: true },
     consentTextVersion: { type: String, required: true },
     notes: { type: String },
+    generalNotes: { type: String },
     possibleDuplicateOf: { type: Schema.Types.ObjectId, ref: 'Patient' },
+    duplicateDismissed: { type: Boolean, default: false },
     deletedAt: { type: Date },
+    version: { type: Number, default: 1 },
     schemaVersion: { type: Number, default: 1 },
     createdBy: {
       type: {
@@ -75,8 +83,12 @@ const PatientSchema = new Schema<IPatient>(
   }
 );
 
-// Enforce rule: exactly one of ageYears or dob is required
+// Pre-validate hook: sync searchName and enforce ageYears/dob exclusivity
 PatientSchema.pre('validate', function () {
+  if (this.name) {
+    this.searchName = this.name.toLowerCase().trim().replace(/\s+/g, ' ');
+  }
+
   const hasAge = this.ageYears !== undefined && this.ageYears !== null;
   const hasDob = !!this.dob;
 
@@ -91,9 +103,10 @@ PatientSchema.pre('validate', function () {
 // Indexes per requirements:
 // patients {clinicId, patientCode} unique;
 // patients {clinicId, phone};
-// patients text index on name, phone, patientCode;
+// patients {clinicId, deletedAt, searchName} for fast prefix search;
 PatientSchema.index({ clinicId: 1, patientCode: 1 }, { unique: true });
 PatientSchema.index({ clinicId: 1, phone: 1 });
+PatientSchema.index({ clinicId: 1, deletedAt: 1, searchName: 1 });
 PatientSchema.index(
   { name: 'text', phone: 'text', patientCode: 'text' },
   { name: 'patient_text_search' }

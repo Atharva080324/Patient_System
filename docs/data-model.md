@@ -244,3 +244,36 @@ Every document contains:
 3. **Financial Records:**
    - `bills`, `prescriptions`, `estimates`, and `visits` cannot be deleted; they use workflow status flags (`CANCELLED`, `EXPIRED`, etc.).
    - `bills.paid` and `bills.balance` can only be calculated and updated via `recomputeBill(bill, payments)`.
+
+---
+
+## 5. Phase 6: Patient Directory, Search & Dashboard Data Model
+
+### Patient Schema Extensions
+- `searchName`: String, lowercase trimmed space-collapsed name (e.g., `rahul sharma` or `राहुल शर्मा`), indexed for prefix matching. Synchronized automatically on every document pre-validate hook.
+- `version`: Number, optimistic locking token (default: 1). Incremented on every update. Stale version writes throw `PatientVersionConflictError` (HTTP 409).
+- `duplicateDismissed`: Boolean, flag indicating whether the doctor dismissed the duplicate warning banner.
+- `generalNotes`: String, general non-medical clinical practice notes.
+
+### Compound Indexes for Phase 6 Performance
+- `patients`: `{ clinicId: 1, deletedAt: 1, searchName: 1 }` (prefix matching with index bounds)
+- `patients`: `{ clinicId: 1, deletedAt: 1, phone: 1 }`
+- `patients`: `{ clinicId: 1, deletedAt: 1, patientCode: 1 }`
+- `visits`: `{ clinicId: 1, date: 1, status: 1 }`
+- `appointments`: `{ clinicId: 1, clinicDate: 1, status: 1 }`
+- `followUps`: `{ clinicId: 1, dueDate: 1, status: 1 }`
+- `bills`: `{ clinicId: 1, status: 1, balanceAmount: 1 }`
+- `payments`: `{ clinicId: 1, status: 1, paymentDate: 1 }`
+
+### Search Engine Design
+Prefix searches do not require expensive COLLSCAN or regex full-scans. The query anchors to start of string or words:
+- Name: Anchored regex `^term` or `(^| )term` on `searchName`.
+- Phone: Exact match on normalized 10-digit, last 4+ digits suffix `$`, or full normalized mobile via `indianMobile`.
+- Code: Cleaned prefix `^term` on `patientCode`.
+- All user inputs are strictly guarded by `assertPlainInput` and metacharacter escaping.
+
+### CSV Export & Formula Injection Neutralization
+- RFC 4180 standard escaping (fields containing commas, double quotes, or newlines are wrapped in quotes; double quotes are escaped as `""`).
+- Excel UTF-8 BOM (`\uFEFF`) is prepended to ensure Devanagari and non-ASCII names display cleanly.
+- Formula injection defense: any cell starting with `=`, `+`, `-`, `@`, `\t`, or `\r` is prefixed with `'` (single quote) to prevent remote formula execution when opening in Excel or Sheets. Phone numbers and numeric currency fields remain uncorrupted pure digits.
+- Rate-limited to 10 exports per minute per user; capped at 20,000 rows. Fresh doctor password confirmation required within 5 minutes.

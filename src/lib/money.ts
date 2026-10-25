@@ -62,7 +62,7 @@ export function toRupeesString(paise: Paise): string {
 /**
  * Formats integer Paise with en-IN locale (₹ sign, Lakh/Crore grouping).
  */
-export function formatINR(paise: Paise): string {
+export function formatINR(paise: Paise | number): string {
   const rupees = Number(paise) / 100;
   return new Intl.NumberFormat('en-IN', {
     style: 'currency',
@@ -71,6 +71,8 @@ export function formatINR(paise: Paise): string {
     maximumFractionDigits: 2,
   }).format(rupees);
 }
+
+export const formatRupees = formatINR;
 
 /**
  * Addition with overflow protection.

@@ -47,6 +47,11 @@ export default defineConfig({
         'src/lib/appointment-service.ts',
         'src/lib/followup-service.ts',
         'src/lib/hmac.ts',
+        'src/lib/patient-search-service.ts',
+        'src/lib/patient-update-service.ts',
+        'src/lib/timeline-builder.ts',
+        'src/lib/csv-writer.ts',
+        'src/lib/dashboard-service.ts',
       ],
       thresholds: {
         perFile: true,

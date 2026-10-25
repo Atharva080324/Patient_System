@@ -98,6 +98,7 @@ export const RateLimitRules = {
   loginIpFailure: (ip: string) => rateLimit(`login:ip:fail:${ip}`, 20, 15 * 60),
   kioskUnlockIp: (ip: string) => rateLimit(`kiosk:unlock:${ip}`, 5, 15 * 60),
   defaultApi: (ip: string) => rateLimit(`api:ip:${ip}`, 120, 60),
+  patientExport: (userId: string, clinicId: string) => rateLimit(`patient:export:${clinicId}:${userId}`, 10, 60),
   checkIntegrationKey: async (keyId: string, ip: string) => {
     const keyRes = await rateLimit(`integration:key:${keyId}`, 120, 60);
     const ipRes = await rateLimit(`integration:ip:${ip}`, 120, 60);

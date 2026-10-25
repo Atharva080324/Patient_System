@@ -32,6 +32,12 @@ const REDACTED_KEYS = new Set([
   'encryptedsecret',
   'contactname',
   'contactphone',
+  'search',
+  'q',
+  'searchterm',
+  'query',
+  'searchname',
+  'exportdata',
 ]);
 
 export function redactSensitiveData(obj: unknown): unknown {
@@ -41,6 +47,10 @@ export function redactSensitiveData(obj: unknown): unknown {
     // Redact 10-digit phone patterns in raw strings
     if (/\b[6-9]\d{9}\b/.test(obj)) {
       return '[REDACTED_PHONE]';
+    }
+    // Redact search terms in URLs like /api/patients?q=Secret
+    if (/[?&](?:q|search|searchTerm)=([^&]+)/i.test(obj)) {
+      return obj.replace(/([?&](?:q|search|searchTerm)=)([^&]+)/gi, '$1[REDACTED]');
     }
     return obj;
   }
