@@ -9,6 +9,7 @@ import {
   STANDARD_DENTAL_CONDITIONS,
   getToothLabel,
 } from '@/lib/fdi-tooth';
+import { clock } from '@/lib/clock';
 
 interface PatientInfo {
   _id: string;
@@ -176,8 +177,6 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
   // Fetch consultation workspace data
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
-      setError(null);
       const res = await fetch(`/api/consult/${visitId}`, { cache: 'no-store' });
       const data = await res.json();
 
@@ -232,8 +231,51 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
   }, [visitId]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    let active = true;
+    void fetch(`/api/consult/${visitId}`, { cache: 'no-store' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        setPatient(data.patient);
+        setVisit(data.visit);
+        setPastVisits(data.pastVisits || []);
+        if (data.caseSheet) {
+          setCaseSheet(data.caseSheet);
+          lastSavedPayloadRef.current = JSON.stringify({
+            chiefComplaint: data.caseSheet.chiefComplaint || '',
+            history: data.caseSheet.history || '',
+            medicalHistoryNotes: data.caseSheet.medicalHistoryNotes || '',
+            allergies: data.caseSheet.allergies || [],
+            examinationFindings: data.caseSheet.examinationFindings || '',
+            diagnosis: data.caseSheet.diagnosis || '',
+            treatmentDoneOrAdvised: data.caseSheet.treatmentDoneOrAdvised || '',
+            notes: data.caseSheet.notes || '',
+            teethEntries: data.caseSheet.teethEntries || [],
+          });
+        }
+        if (data.prescription) {
+          setPrescription(data.prescription);
+        } else {
+          setPrescription({
+            _id: '',
+            status: 'DRAFT',
+            items: [],
+            advice: '',
+            followUpDate: '',
+            language: 'en',
+            version: 1,
+          });
+        }
+        setLoading(false);
+        initialLoadDoneRef.current = true;
+      })
+      .catch(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [visitId]);
 
   // Debounced autosave for case sheet
   useEffect(() => {
@@ -303,7 +345,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
           version: resData.caseSheet.version,
         }));
         setSaveStatus('saved');
-        const now = new Date();
+        const now = clock.now();
         setLastSavedTime(
           now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         );
@@ -751,6 +793,22 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                 <span className="text-slate-400">Ready</span>
               )}
             </div>
+
+            {/* Phase 4 Billing & Estimate Entry Points */}
+            <Link
+              id="btn-consult-create-estimate"
+              href={`/billing/estimates/new?visitId=${visit._id}&patientId=${patient._id}`}
+              className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white text-xs font-semibold border border-slate-700 shadow-sm transition"
+            >
+              + Estimate
+            </Link>
+            <Link
+              id="btn-consult-create-bill"
+              href={`/billing/bills/new?visitId=${visit._id}&patientId=${patient._id}`}
+              className="px-3.5 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-semibold shadow-sm transition"
+            >
+              + Bill
+            </Link>
 
             {/* Complete Visit Button */}
             {visit.status === 'IN_CONSULTATION' && (

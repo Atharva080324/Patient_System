@@ -183,6 +183,14 @@ export function QueueClient() {
             </button>
 
             <Link
+              id="link-billing"
+              href="/billing"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition shadow-sm"
+            >
+              Billing & Estimates
+            </Link>
+
+            <Link
               id="link-closing-report"
               href="/reports/closing"
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm"

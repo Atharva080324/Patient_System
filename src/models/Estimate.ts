@@ -30,7 +30,7 @@ export interface IEstimate extends Document {
   replacesEstimateId?: mongoose.Types.ObjectId;
   cancelReason?: string;
   issuedAt?: Date;
-  snapshot?: Record<string, unknown>;
+  snapshot?: any;
   printCount: number;
   version: number;
   schemaVersion: number;
@@ -91,8 +91,11 @@ const EstimateSchema = new Schema<IEstimate>(
   }
 );
 
-// Unique index for issued estimate numbers per clinic
-EstimateSchema.index({ clinicId: 1, estimateNo: 1 }, { unique: true, sparse: true });
+// Unique index for issued estimate numbers per clinic (only indexed once estimate is issued and has estimateNo)
+EstimateSchema.index(
+  { clinicId: 1, estimateNo: 1 },
+  { unique: true, partialFilterExpression: { estimateNo: { $type: 'string' } } }
+);
 EstimateSchema.index({ clinicId: 1, patientId: 1, createdAt: -1 });
 
 EstimateSchema.plugin(tenancyPlugin);

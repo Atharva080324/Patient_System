@@ -27,7 +27,7 @@ interface ClosingReportData {
 }
 
 export function ClosingReportClient() {
-  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<string>(() => clinicDate(clock.now()));
   const [report, setReport] = useState<ClosingReportData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -35,9 +35,6 @@ export function ClosingReportClient() {
   useEffect(() => {
     let mounted = true;
     const targetDate = selectedDate || clinicDate(clock.now());
-    if (!selectedDate) {
-      setSelectedDate(targetDate);
-    }
 
     fetch(`/api/reports/closing?date=${targetDate}`)
       .then((res) => (res.ok ? res.json() : null))

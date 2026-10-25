@@ -48,8 +48,15 @@ export function requireTenantContext(): TenantContext {
   return ctx;
 }
 
-export function runWithTenantContext<T>(context: TenantContext, fn: () => Promise<T> | T): Promise<T> {
-  return storage.run(context, async () => await fn());
+export function runWithTenantContext<T>(
+  context: { clinicId: mongoose.Types.ObjectId | string; actor: TenantActor; isSystem?: boolean },
+  fn: () => Promise<T> | T
+): Promise<T> {
+  const normalized: TenantContext = {
+    ...context,
+    clinicId: typeof context.clinicId === 'string' ? new mongoose.Types.ObjectId(context.clinicId) : context.clinicId,
+  };
+  return storage.run(normalized, async () => await fn());
 }
 
 export const SYSTEM_ADMIN_CLINIC_ID = new mongoose.Types.ObjectId('000000000000000000000000');

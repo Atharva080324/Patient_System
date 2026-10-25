@@ -40,7 +40,7 @@ export const SavePrescriptionDraftSchema = z
   })
   .strict();
 
-export type SavePrescriptionDraftInput = z.infer<typeof SavePrescriptionDraftSchema>;
+export type SavePrescriptionDraftInput = z.input<typeof SavePrescriptionDraftSchema>;
 
 export async function getPrescriptionForVisit(
   clinicId: mongoose.Types.ObjectId | string,
@@ -66,7 +66,7 @@ export async function savePrescriptionDraft(
   const clinicObjectId = new mongoose.Types.ObjectId(clinicId);
   const visitObjectId = new mongoose.Types.ObjectId(visitId);
 
-  let existing = await Prescription.findOne({
+  const existing = await Prescription.findOne({
     clinicId: clinicObjectId,
     visitId: visitObjectId,
     status: 'DRAFT',

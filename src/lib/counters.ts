@@ -20,52 +20,53 @@ export async function withTransaction<T>(
   fn: (session: ClientSession) => Promise<T>,
   options: TransactionOptions = {}
 ): Promise<T> {
-  const maxRetries = options.maxRetries ?? 3;
-  const initialDelayMs = options.initialDelayMs ?? 50;
+  const maxRetries = options.maxRetries ?? 30;
+  const initialDelayMs = options.initialDelayMs ?? 25;
 
   const session = await mongoose.startSession();
 
-  let attempt = 0;
-  while (attempt <= maxRetries) {
-    try {
-      session.startTransaction();
-      const result = await fn(session);
-      await session.commitTransaction();
-      return result;
-    } catch (error: any) {
-      if (session.inTransaction()) {
-        try {
-          await session.abortTransaction();
-        } catch {
-          // Ignore abort errors
+  try {
+    let attempt = 0;
+    while (attempt <= maxRetries) {
+      try {
+        session.startTransaction();
+        const result = await fn(session);
+        await session.commitTransaction();
+        return result;
+      } catch (error: any) {
+        if (session.inTransaction()) {
+          try {
+            await session.abortTransaction();
+          } catch {
+            // Ignore abort errors
+          }
         }
-      }
 
-      const isTransient =
-        error?.hasErrorLabel?.('TransientTransactionError') ||
-        error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
-        error?.message?.includes('TransientTransactionError') ||
-        error?.message?.includes('UnknownTransactionCommitResult') ||
-        error?.name === 'MongoTransactionError';
+        const isTransient =
+          error?.hasErrorLabel?.('TransientTransactionError') ||
+          error?.hasErrorLabel?.('UnknownTransactionCommitResult') ||
+          error?.message?.includes('TransientTransactionError') ||
+          error?.message?.includes('UnknownTransactionCommitResult') ||
+          error?.message?.toLowerCase().includes('write conflict') ||
+          error?.code === 112 ||
+          error?.name === 'MongoTransactionError';
 
-      if (isTransient && attempt < maxRetries) {
-        attempt++;
-        const backoff = initialDelayMs * Math.pow(2, attempt - 1);
-        const jitter = Math.floor(Math.random() * 25);
-        await new Promise((resolve) => setTimeout(resolve, backoff + jitter));
-        continue;
-      }
+        if (isTransient && attempt < maxRetries) {
+          attempt++;
+          const backoff = initialDelayMs * Math.min(attempt, 15);
+          const jitter = Math.floor(Math.random() * 50);
+          await new Promise((resolve) => setTimeout(resolve, backoff + jitter));
+          continue;
+        }
 
-      throw error;
-    } finally {
-      if (attempt >= maxRetries && !session.inTransaction()) {
-        // Will exit loop or throw
+        throw error;
       }
     }
-  }
 
-  await session.endSession();
-  throw new Error('Transaction failed after maximum retries');
+    throw new Error('Transaction failed after maximum retries');
+  } finally {
+    await session.endSession();
+  }
 }
 
 /**

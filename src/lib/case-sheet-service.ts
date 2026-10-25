@@ -34,7 +34,7 @@ export const SaveCaseSheetSchema = z
   })
   .strict();
 
-export type SaveCaseSheetInput = z.infer<typeof SaveCaseSheetSchema>;
+export type SaveCaseSheetInput = z.input<typeof SaveCaseSheetSchema>;
 
 export async function getOrCreateCaseSheet(
   clinicId: mongoose.Types.ObjectId | string,

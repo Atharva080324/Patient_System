@@ -5,6 +5,7 @@ import {
 import { IClinic } from '../models/Clinic';
 import { IUser } from '../models/User';
 import { IPatient } from '../models/Patient';
+import { clock } from './clock';
 
 export interface BuildSnapshotParams {
   clinic: Partial<IClinic>;
@@ -30,7 +31,7 @@ export function buildPrescriptionSnapshot(params: BuildSnapshotParams): IPrescri
     advice,
     followUpDate,
     language = 'en',
-    issuedAt = new Date(),
+    issuedAt = clock.now(),
   } = params;
 
   if (!rxNumber || !rxNumber.trim()) {

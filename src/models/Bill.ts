@@ -53,7 +53,7 @@ const BillSchema = new Schema<IBill>(
         amount: { type: Number, required: true }, // integer paise
       },
     ],
-    subtotal: { type: Number, required: true }, // integer paise
+    subtotal: { type: Number, default: function () { return (this as any).total || 0; } }, // integer paise
     discount: { type: Number, required: true, default: 0 }, // integer paise
     total: { type: Number, required: true }, // integer paise
     paid: { type: Number, required: true, default: 0 }, // integer paise

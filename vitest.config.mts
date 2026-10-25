@@ -36,6 +36,13 @@ export default defineConfig({
         'src/lib/prescription-snapshot.ts',
         'src/lib/medicine-search.ts',
         'src/lib/prescription-set-service.ts',
+        'src/lib/billing.ts',
+        'src/lib/bill-service.ts',
+        'src/lib/bill-state-machine.ts',
+        'src/lib/estimate-service.ts',
+        'src/lib/estimate-state-machine.ts',
+        'src/lib/estimate-to-bill.ts',
+        'src/lib/payment-service.ts',
       ],
       thresholds: {
         perFile: true,

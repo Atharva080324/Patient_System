@@ -24,7 +24,7 @@ export const PrescriptionSetInputSchema = z
   })
   .strict();
 
-export type PrescriptionSetInput = z.infer<typeof PrescriptionSetInputSchema>;
+export type PrescriptionSetInput = z.input<typeof PrescriptionSetInputSchema>;
 
 export async function listPrescriptionSets(
   clinicId: mongoose.Types.ObjectId | string

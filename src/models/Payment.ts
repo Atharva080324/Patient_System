@@ -34,7 +34,7 @@ const PaymentSchema = new Schema<IPayment>(
     isReversal: { type: Boolean, default: false, required: true },
     reversalOf: { type: Schema.Types.ObjectId, ref: 'Payment' },
     reversalReason: { type: String },
-    idempotencyKey: { type: String, sparse: true },
+    idempotencyKey: { type: String },
     snapshot: { type: Schema.Types.Mixed },
     printCount: { type: Number, default: 0, required: true },
     receivedAt: { type: Date, required: true },
@@ -66,10 +66,10 @@ PaymentSchema.index(
   { unique: true, partialFilterExpression: { reversalOf: { $exists: true } } }
 );
 
-// Idempotency key per clinic
+// Idempotency key per clinic (only index documents that actually specify idempotencyKey)
 PaymentSchema.index(
   { clinicId: 1, idempotencyKey: 1 },
-  { unique: true, sparse: true }
+  { unique: true, partialFilterExpression: { idempotencyKey: { $type: 'string' } } }
 );
 
 PaymentSchema.plugin(tenancyPlugin);

@@ -130,7 +130,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
 
   describe('case-sheet-service branches', () => {
     it('throws error when getOrCreateCaseSheet is called with non-existent visit', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(getOrCreateCaseSheet(clinicId, fakeId, doctorActor)).rejects.toThrow(
           /Visit not found/
@@ -139,7 +139,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when saveCaseSheet is called for non-existent case sheet', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(
           saveCaseSheet(clinicId, fakeId, { version: 1, chiefComplaint: 'Pain' }, doctorActor)
@@ -148,7 +148,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('returns existing case sheet without database update when no fields changed', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
         const savedAgain = await saveCaseSheet(
           clinicId,
@@ -165,7 +165,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('handles race condition when findOneAndUpdate returns null', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
 
         const spy = vi.spyOn(CaseSheet, 'findOneAndUpdate').mockResolvedValueOnce(null as any);
@@ -185,7 +185,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('handles race condition when CaseSheet.create throws code 11000 duplicate key', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const dummyVisit = await Visit.create({
           clinicId,
           patientId: testPatient._id,
@@ -238,7 +238,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('syncs updated allergies to Patient record', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
         const updated = await saveCaseSheet(
           clinicId,
@@ -256,7 +256,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('creates case sheet when patient has no medicalHistory', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const rawPatient = await Patient.create({
           clinicId,
           patientCode: 'P-NO-HIST-01',
@@ -290,7 +290,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('creates case sheet when patient record is null or missing', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const dummyVisit = await Visit.create({
           clinicId,
           patientId: new mongoose.Types.ObjectId(),
@@ -313,7 +313,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('re-throws unexpected error when CaseSheet.create fails with non-11000 error', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const dummyVisit = await Visit.create({
           clinicId,
           patientId: testPatient._id,
@@ -337,7 +337,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('re-throws duplicate key error if existing sheet is not found after code 11000', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const dummyVisit = await Visit.create({
           clinicId,
           patientId: testPatient._id,
@@ -366,7 +366,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('saves and detects changes in teethEntries array', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
         const updated = await saveCaseSheet(
           clinicId,
@@ -395,7 +395,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('uses existing case sheet in VersionConflictError if fresh findOne returns null', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
         const spyUpdate = vi.spyOn(CaseSheet, 'findOneAndUpdate').mockResolvedValueOnce(null as any);
         let findCount = 0;
@@ -429,7 +429,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
 
   describe('medicine-search branches', () => {
     it('exercises substring contains search fallback when prefix matches are fewer than limit', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         await Medicine.create({
           clinicId,
           genericName: 'Sodium Fluoride Varnish',
@@ -450,7 +450,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('toggles medicine favorite on and off', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const med = await Medicine.create({
           clinicId,
           genericName: 'Diclofenac Sodium',
@@ -475,7 +475,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('sorts empty query results by favorites and useCount, supplements with extra medicines, and exercises search ranking comparator', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const medA = await Medicine.create({
           clinicId,
           genericName: 'Amoxicillin Trihydrate',
@@ -579,7 +579,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('reactivates an existing deactivated custom medicine when created again', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const med = await createCustomMedicine(
           clinicId,
           {
@@ -612,7 +612,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when deactivating non-existent or non-custom medicine', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(deactivateCustomMedicine(clinicId, fakeId, doctorActor)).rejects.toThrow(
           /Custom medicine not found/
@@ -623,14 +623,14 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
 
   describe('prescription-service branches', () => {
     it('exercises getPrescriptionForVisit', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const resNull = await getPrescriptionForVisit(clinicId, new mongoose.Types.ObjectId());
         expect(resNull).toBeNull();
       });
     });
 
     it('throws error when saving draft for non-existent visit', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(
           savePrescriptionDraft(clinicId, fakeId, { items: [], language: 'en' }, doctorActor)
@@ -639,7 +639,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('updates an existing draft when savePrescriptionDraft is called again', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const draft1 = await savePrescriptionDraft(
           clinicId,
           testVisit._id,
@@ -684,7 +684,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('issues prescription with both catalog and freeform items and creates correction prescription', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const medSample = await Medicine.findOne({ clinicId });
         const draft = await savePrescriptionDraft(
           clinicId,
@@ -744,7 +744,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
         );
         const issuedNoDoc = await issuePrescription(clinicId, draftNoDoc._id, doctorActor);
         expect(issuedNoDoc.status).toBe('ISSUED');
-        expect(issuedNoDoc.snapshot.doctor.name).toBe('Dr. Susheel');
+        expect(issuedNoDoc.snapshot?.doctor?.name).toBe('Dr. Susheel');
         spyDoc.mockRestore();
 
         // Correct prescription
@@ -764,7 +764,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when issuing non-existent prescription or empty items', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(issuePrescription(clinicId, fakeId, doctorActor)).rejects.toThrow(
           /Prescription not found/
@@ -784,7 +784,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when clinic or patient not found during issue', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const draft = await savePrescriptionDraft(
           clinicId,
           testVisit._id,
@@ -821,7 +821,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when voiding non-existent prescription or non-ISSUED prescription', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(voidPrescription(clinicId, fakeId, 'Reason', doctorActor)).rejects.toThrow(
           /Prescription not found/
@@ -838,7 +838,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
     });
 
     it('throws error when recordPrescriptionPrint is called for non-existent prescription', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(recordPrescriptionPrint(clinicId, fakeId, doctorActor)).rejects.toThrow(
           /Prescription not found/
@@ -849,7 +849,7 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
 
   describe('prescription-set-service branches', () => {
     it('throws error when updating or deleting non-existent prescription set', async () => {
-      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+      await runWithTenantContext({ clinicId, actor: doctorActor }, async () => {
         const fakeId = new mongoose.Types.ObjectId();
         await expect(
           updatePrescriptionSet(

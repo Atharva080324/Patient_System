@@ -17,17 +17,16 @@ export function recomputeBill(
   payments: PaymentRecord[] = [],
   isCancelled = false
 ): { paid: Paise; balance: Paise; status: BillStatus } {
+  const paidSum = payments.reduce((acc, p) => addPaise(acc, p.amount), asPaise(0));
+  const paid = asPaise(Math.max(0, Number(paidSum)));
+
   if (isCancelled) {
-    const paidSum = payments.reduce((acc, p) => addPaise(acc, p.amount), asPaise(0));
     return {
-      paid: paidSum,
+      paid,
       balance: asPaise(0),
       status: 'CANCELLED',
     };
   }
-
-  const paidSum = payments.reduce((acc, p) => addPaise(acc, p.amount), asPaise(0));
-  const paid = asPaise(Math.max(0, Number(paidSum)));
 
   if (paid >= total) {
     return {

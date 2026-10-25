@@ -14,27 +14,29 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
   const [paperSize, setPaperSize] = useState<'A5' | 'A4'>('A5');
   const [isReprint, setIsReprint] = useState(false);
 
-  const fetchRx = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const res = await fetch(`/api/prescriptions/${prescriptionId}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'Failed to load prescription');
-      }
-      setRx(data.prescription);
-      setIsReprint((data.prescription.printCount || 0) > 0);
-    } catch (err: any) {
-      setError(err.message || 'Error loading prescription');
-    } finally {
-      setLoading(false);
-    }
-  }, [prescriptionId]);
-
   useEffect(() => {
-    fetchRx();
-  }, [fetchRx]);
+    let active = true;
+    fetch(`/api/prescriptions/${prescriptionId}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setRx(data.prescription);
+          setIsReprint((data.prescription?.printCount || 0) > 0);
+        }
+        setLoading(false);
+      })
+      .catch((err) => {
+        if (!active) return;
+        setError(err.message || 'Error loading prescription');
+        setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [prescriptionId]);
 
   const handlePrint = async () => {
     try {

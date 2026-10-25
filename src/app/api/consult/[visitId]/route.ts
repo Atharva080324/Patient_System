@@ -22,23 +22,25 @@ export const GET = withAuth(async (req: NextRequest, auth) => {
   const clinicId = auth.session.clinicId;
   const actor = { type: 'USER' as const, id: auth.user._id.toString() };
 
-  let visit = await Visit.findOne({ clinicId, _id: visitId });
-  if (!visit) {
+  const foundVisit = await Visit.findOne({ clinicId, _id: visitId });
+  if (!foundVisit) {
     return NextResponse.json({ error: 'Visit not found' }, { status: 404 });
   }
 
+  let currentVisit: any = foundVisit;
+
   // If visit is WAITING, transition to IN_CONSULTATION automatically using P2 state machine
   let autoCalledIn = false;
-  if (visit.status === 'WAITING') {
+  if (currentVisit.status === 'WAITING') {
     try {
-      visit = await transitionVisitStatus(clinicId, visitId, 'IN_CONSULTATION', visit.version, actor);
+      currentVisit = await transitionVisitStatus(clinicId, visitId, 'CALL_IN', currentVisit.version, actor);
       autoCalledIn = true;
     } catch (err: any) {
       // If single-occupancy operatory conflict, continue in read-only or error
       return NextResponse.json(
         {
           error: err.message || 'Cannot call patient into consultation',
-          status: visit.status,
+          status: currentVisit.status,
           chairOccupied: err.statusCode === 409,
         },
         { status: err.statusCode || 400 }
@@ -46,7 +48,7 @@ export const GET = withAuth(async (req: NextRequest, auth) => {
     }
   }
 
-  const patient = await Patient.findOne({ clinicId, _id: visit.patientId });
+  const patient = await Patient.findOne({ clinicId, _id: currentVisit.patientId });
   if (!patient) {
     return NextResponse.json({ error: 'Patient not found' }, { status: 404 });
   }
@@ -58,7 +60,7 @@ export const GET = withAuth(async (req: NextRequest, auth) => {
   const pastVisitsRaw = await Visit.find({
     clinicId,
     patientId: patient._id,
-    _id: { $ne: visit._id },
+    _id: { $ne: currentVisit._id },
     status: { $in: ['COMPLETED', 'IN_CONSULTATION'] },
   })
     .sort({ date: -1, createdAt: -1 })
@@ -86,14 +88,14 @@ export const GET = withAuth(async (req: NextRequest, auth) => {
   return NextResponse.json({
     success: true,
     visit: {
-      _id: visit._id.toString(),
-      token: visit.token,
-      date: visit.date,
-      type: visit.type,
-      status: visit.status,
-      version: visit.version,
-      reasonForVisit: visit.reasonForVisit,
-      isReadOnly: visit.status !== 'IN_CONSULTATION',
+      _id: currentVisit._id.toString(),
+      token: currentVisit.token,
+      date: currentVisit.date,
+      type: currentVisit.type,
+      status: currentVisit.status,
+      version: currentVisit.version,
+      reasonForVisit: currentVisit.reasonForVisit,
+      isReadOnly: currentVisit.status !== 'IN_CONSULTATION',
       autoCalledIn,
     },
     patient: {

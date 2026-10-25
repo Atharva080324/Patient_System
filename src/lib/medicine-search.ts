@@ -37,7 +37,7 @@ export const CustomMedicineSchema = z
   })
   .strict();
 
-export type CustomMedicineInput = z.infer<typeof CustomMedicineSchema>;
+export type CustomMedicineInput = z.input<typeof CustomMedicineSchema>;
 
 export async function searchMedicines(
   clinicId: mongoose.Types.ObjectId | string,

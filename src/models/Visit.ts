@@ -21,7 +21,7 @@ export interface ITreatmentPlanItem {
   status: string;
 }
 
-export interface ICaseSheet {
+export interface IVisitCaseSheet {
   chiefComplaint: string;
   historyOfPresentIllness: string;
   extraOral: string;
@@ -49,7 +49,7 @@ export interface IVisit extends Document {
   noShowAt?: Date;
   cancelledAt?: Date;
   reasonForVisit: string;
-  caseSheet: ICaseSheet;
+  caseSheet: IVisitCaseSheet;
   prescriptionId?: mongoose.Types.ObjectId;
   billId?: mongoose.Types.ObjectId;
   estimateId?: mongoose.Types.ObjectId;

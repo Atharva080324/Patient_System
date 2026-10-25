@@ -117,26 +117,45 @@ Every document contains:
   - `{ clinicId: 1, category: 1 }`
 
 ### `estimates`
-- Fields: `clinicId`, `patientId`, `doctorId`, `estimateNo`, `items`: `[ { tooth?, treatmentId, name, price, qty, discount, total } ]`, `subtotal`, `discountTotal`, `grandTotal`, `status` (DRAFT/PRESENTED/ACCEPTED/DECLINED/EXPIRED), `validUntil`
-- Invariants: Money stored exclusively in Paise.
+- Fields: `clinicId`, `patientId`, `visitId?`, `estimateNo?`, `items`: `[ { treatmentId?, description, teeth: number[], qty, listPrice, unitPrice, amount } ]`, `subtotal`, `discount`, `total`, `validUntil?`, `notes?`, `status` (`DRAFT`/`ISSUED`/`CONVERTED`/`CANCELLED`), `convertedToBillId?`, `replacesEstimateId?`, `cancelReason?`, `snapshot?` (frozen letterhead, patient, doctor, items, totals), `printCount`, `version`, `issuedAt?`, `createdBy`
+- Invariants:
+  - Numbers in series: `EST/YYYY-YY/XXXX` allocated atomically inside transaction upon transition to `ISSUED`.
+  - Money stored exclusively in integer `Paise`. Zero floating-point arithmetic.
+  - Frozen snapshot created upon `ISSUED`; future price changes or patient edits do not alter the snapshot.
 - Indexes:
-  - `{ clinicId: 1, estimateNo: 1 }` (unique)
-  - `{ clinicId: 1, patientId: 1 }`
+  - `{ clinicId: 1, estimateNo: 1 }` (unique, sparse)
+  - `{ clinicId: 1, patientId: 1, createdAt: -1 }`
+  - `{ clinicId: 1, status: 1 }`
 
 ### `bills`
-- Fields: `clinicId`, `patientId`, `doctorId`, `billNo`, `items`, `subtotal`, `discountTotal`, `taxTotal`, `total`, `paid`, `balance`, `status` (PENDING/PARTIAL/PAID/CANCELLED), `notes?`
-- Invariants: `paid` and `balance` are set exclusively by pure function `recomputeBill(bill, payments)`. Never deleted.
+- Fields: `clinicId`, `patientId`, `visitId?`, `estimateId?`, `billNo`, `items`: `[ { treatmentId?, description, teeth: number[], qty, listPrice, unitPrice, amount } ]`, `subtotal`, `discount`, `total`, `paid`, `balance`, `status` (`UNPAID`/`PARTIAL`/`PAID`/`CANCELLED`), `activeForVisit` (boolean), `cancelReason?`, `printCount`, `version`, `createdBy`
+- Invariants:
+  - Numbers in series: `BILL/YYYY-YY/XXXX` allocated atomically inside transaction upon bill creation.
+  - `paid`, `balance`, and `status` are derived and set ONLY by pure reducer `recomputeBill(total, payments)`.
+  - One active bill per visit enforced via partial unique index `{ activeForVisit: true }`.
+  - Editing lines and discounts locked once `paid > 0` or if cancelled.
+  - Cancellation allowed only when `paid === 0` and requires a non-empty audit reason.
 - Indexes:
   - `{ clinicId: 1, billNo: 1 }` (unique)
-  - `{ clinicId: 1, patientId: 1 }`
+  - `{ clinicId: 1, visitId: 1, activeForVisit: 1 }` (unique, partialFilterExpression: `{ activeForVisit: true }`)
+  - `{ clinicId: 1, patientId: 1, createdAt: -1 }`
+  - `{ clinicId: 1, status: 1 }`
 
 ### `payments` (APPEND-ONLY)
-- Fields: `clinicId`, `patientId`, `billId?`, `receiptNo`, `amount` (Paise), `type` (RECEIPT/REVERSAL), `originalPaymentId?`, `mode` (CASH/UPI/CARD/NETBANKING), `referenceNo?`, `notes?`
-- Invariants: Strict append-only. Zero mutations or deletions permitted. Reversals create new documents.
+- Fields: `clinicId`, `billId`, `receiptNo`, `amount` (Paise; negative for reversals), `method` (`CASH`/`UPI`), `upiRef?`, `isReversal` (boolean), `reversalOf?` (ObjectId of original payment), `idempotencyKey?`, `snapshot` (frozen letterhead, patient, billNo, receiptNo, date, method, amount, amountInWords, balanceAfterPayment), `printCount`, `receivedAt`, `createdBy`
+- Invariants:
+  - Strict append-only. Zero updates or deletions permitted (guarded at model schema level).
+  - Numbers in series: `REC/YYYY-YY/XXXX` allocated atomically inside transaction for both payments and reversals.
+  - Reversals create new documents referencing `reversalOf` with required reason; original payment is never modified or deleted.
+  - A payment can be reversed at most once (enforced at code level and database unique partial index).
+  - Reversals cannot be reversed.
+  - Client idempotency key prevents duplicate charges.
 - Indexes:
   - `{ clinicId: 1, receiptNo: 1 }` (unique)
-  - `{ clinicId: 1, billId: 1 }`
-  - `{ clinicId: 1, patientId: 1 }`
+  - `{ clinicId: 1, billId: 1, createdAt: 1 }`
+  - `{ clinicId: 1, idempotencyKey: 1 }` (unique, sparse)
+  - `{ clinicId: 1, reversalOf: 1 }` (unique, partialFilterExpression: `{ reversalOf: { $exists: true } }`)
+  - `{ clinicId: 1, receivedAt: 1 }`
 
 ### `followUps`
 - Fields: `clinicId`, `patientId`, `doctorId`, `dueDate`, `reason`, `status` (SCHEDULED/COMPLETED/CANCELLED/RESCHEDULED), `notes?`, `deletedAt?`
