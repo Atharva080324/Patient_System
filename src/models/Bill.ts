@@ -7,6 +7,7 @@ export interface IBillItem {
   description: string;
   teeth?: number[];
   qty: number;
+  listPrice?: number; // paise
   unitPrice: number; // paise
   amount: number; // paise
 }
@@ -16,13 +17,18 @@ export interface IBill extends Document {
   billNo: string; // BILL/2026-27/0001
   patientId: mongoose.Types.ObjectId;
   visitId?: mongoose.Types.ObjectId;
+  estimateId?: mongoose.Types.ObjectId;
   items: IBillItem[];
+  subtotal: number; // paise
   discount: number; // paise
   total: number; // paise
   paid: number; // paise
   balance: number; // paise
   status: BillStatus;
   cancelReason?: string;
+  activeForVisit?: boolean;
+  version: number;
+  printCount: number;
   schemaVersion: number;
   createdBy: TenantActor;
   createdAt: Date;
@@ -34,17 +40,20 @@ const BillSchema = new Schema<IBill>(
     clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true, index: true },
     billNo: { type: String, required: true },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient', required: true, index: true },
-    visitId: { type: Schema.Types.ObjectId, ref: 'Visit' },
+    visitId: { type: Schema.Types.ObjectId, ref: 'Visit', index: true },
+    estimateId: { type: Schema.Types.ObjectId, ref: 'Estimate', index: true },
     items: [
       {
         treatmentId: { type: Schema.Types.ObjectId, ref: 'Treatment' },
         description: { type: String, required: true },
         teeth: { type: [Number], default: [] },
         qty: { type: Number, required: true, default: 1 },
+        listPrice: { type: Number },
         unitPrice: { type: Number, required: true }, // integer paise
         amount: { type: Number, required: true }, // integer paise
       },
     ],
+    subtotal: { type: Number, required: true }, // integer paise
     discount: { type: Number, required: true, default: 0 }, // integer paise
     total: { type: Number, required: true }, // integer paise
     paid: { type: Number, required: true, default: 0 }, // integer paise
@@ -54,8 +63,12 @@ const BillSchema = new Schema<IBill>(
       enum: ['UNPAID', 'PARTIAL', 'PAID', 'CANCELLED'],
       default: 'UNPAID',
       required: true,
+      index: true,
     },
     cancelReason: { type: String },
+    activeForVisit: { type: Boolean },
+    version: { type: Number, default: 1, required: true },
+    printCount: { type: Number, default: 0, required: true },
     schemaVersion: { type: Number, default: 1 },
     createdBy: {
       type: {
@@ -76,7 +89,13 @@ const BillSchema = new Schema<IBill>(
 // bills {clinicId, billNo} unique;
 // bills {clinicId, patientId};
 BillSchema.index({ clinicId: 1, billNo: 1 }, { unique: true });
-BillSchema.index({ clinicId: 1, patientId: 1 });
+BillSchema.index({ clinicId: 1, patientId: 1, createdAt: -1 });
+
+// One active bill per visit invariant enforced via positive filter partial index:
+BillSchema.index(
+  { clinicId: 1, visitId: 1, activeForVisit: 1 },
+  { unique: true, partialFilterExpression: { activeForVisit: true } }
+);
 
 BillSchema.plugin(tenancyPlugin);
 

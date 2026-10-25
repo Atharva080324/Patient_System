@@ -13,6 +13,10 @@ export interface IPayment extends Document {
   upiRef?: string;
   isReversal: boolean;
   reversalOf?: mongoose.Types.ObjectId;
+  reversalReason?: string;
+  idempotencyKey?: string;
+  snapshot?: Record<string, unknown>;
+  printCount: number;
   receivedAt: Date;
   schemaVersion: number;
   createdBy: TenantActor;
@@ -29,6 +33,10 @@ const PaymentSchema = new Schema<IPayment>(
     upiRef: { type: String },
     isReversal: { type: Boolean, default: false, required: true },
     reversalOf: { type: Schema.Types.ObjectId, ref: 'Payment' },
+    reversalReason: { type: String },
+    idempotencyKey: { type: String, sparse: true },
+    snapshot: { type: Schema.Types.Mixed },
+    printCount: { type: Number, default: 0, required: true },
     receivedAt: { type: Date, required: true },
     schemaVersion: { type: Number, default: 1 },
     createdBy: {
@@ -48,10 +56,21 @@ const PaymentSchema = new Schema<IPayment>(
 );
 
 // Indexes:
-// payments {clinicId, receiptNo} unique;
-// payments {clinicId, billId};
 PaymentSchema.index({ clinicId: 1, receiptNo: 1 }, { unique: true });
-PaymentSchema.index({ clinicId: 1, billId: 1 });
+PaymentSchema.index({ clinicId: 1, billId: 1, createdAt: 1 });
+PaymentSchema.index({ clinicId: 1, receivedAt: 1 });
+
+// Exactly one reversal allowed per payment (enforces race protection on parallel reversal attempts)
+PaymentSchema.index(
+  { clinicId: 1, reversalOf: 1 },
+  { unique: true, partialFilterExpression: { reversalOf: { $exists: true } } }
+);
+
+// Idempotency key per clinic
+PaymentSchema.index(
+  { clinicId: 1, idempotencyKey: 1 },
+  { unique: true, sparse: true }
+);
 
 PaymentSchema.plugin(tenancyPlugin);
 PaymentSchema.plugin(appendOnlyPlugin);
