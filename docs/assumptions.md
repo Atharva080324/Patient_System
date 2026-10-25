@@ -153,3 +153,73 @@
 - Purely a visual reminder chip displaying patient allergies entered by the doctor.
 - Strictly informational: does NOT inspect drugs, does NOT block prescription creation or issuing.
 
+---
+
+# Phase 4: Estimates, Billing, Payments & Receipts Assumptions
+
+## 1. State Machines and Transition Tables
+
+### Estimate State Machine
+- **States:** `DRAFT`, `ISSUED`, `CONVERTED`, `CANCELLED`
+- **Dynamic Computed State:** `EXPIRED` (evaluated on read if `status === 'ISSUED'` and `clock.now() > validUntilEndOfDay`). Never stored as a stale value.
+- **Transition Table:**
+  | Current Status | Allowed Action | Next Status | Invariant / Preconditions |
+  | :--- | :--- | :--- | :--- |
+  | `DRAFT` | `ISSUE` | `ISSUED` | Validates lines (1..99 qty, valid FDI teeth, positive unitPrice). Allocates gapless `EST/FY/0001` in transaction. Freezes complete print snapshot. |
+  | `DRAFT` | `CANCEL` | `CANCELLED` | Requires `cancelReason`. Terminal. |
+  | `ISSUED` | `CONVERT` | `CONVERTED` | Atomically converts to a single `Bill`. Requires estimate not expired. Stores `convertedToBillId`. Terminal. |
+  | `ISSUED` | `CANCEL` | `CANCELLED` | Requires `cancelReason`. Allows creating replacing estimate via `replacesEstimateId`. Terminal. |
+  | `CONVERTED`| None | None | Terminal. Cannot be edited, cancelled, or re-converted. |
+  | `CANCELLED`| None | None | Terminal. Cannot be edited, issued, or converted. |
+
+### Bill State Machine
+- **States:** `UNPAID`, `PARTIAL`, `PAID`, `CANCELLED`
+- **Derived Status Rule:** Bill status is derived exclusively by `recomputeBill(total, payments, isCancelled)`. Direct modification of status or financial fields is prohibited.
+- **Transition Table:**
+  | Current Status | Event / Trigger | Next Status | Conditions / Invariants |
+  | :--- | :--- | :--- | :--- |
+  | `UNPAID` | Payment (`paid < total`) | `PARTIAL` | `paid > 0 && balance > 0` |
+  | `UNPAID` | Payment (`paid === total`)| `PAID` | `paid === total && balance === 0` |
+  | `UNPAID` | Action `CANCEL` | `CANCELLED` | Net paid must be 0. Requires `cancelReason`. Releases `activeForVisit` lock. |
+  | `PARTIAL`| Payment (`paid === total`)| `PAID` | Balance reaches 0. |
+  | `PARTIAL`| Reversal of all payments | `UNPAID` | Net paid returns to 0. |
+  | `PAID` | Partial reversal | `PARTIAL` | Balance becomes > 0. |
+  | `PAID` | Total reversal | `UNPAID` | Net paid returns to 0. |
+  | `CANCELLED`| None | None | Terminal. Cannot receive payments or edits. |
+
+### Payment & Reversal State Machine
+- **Model:** Append-only documents. Zero in-place edits or deletions.
+- **Types:** Standard payment (`amount > 0`) vs Reversal (`isReversal: true, amount < 0, reversalOf: originalPaymentId`).
+- **Reversal Constraints:**
+  - A payment can be reversed at most once. Enforced by unique index on `{ clinicId: 1, reversalOf: 1 }`.
+  - A reversal cannot be reversed (`reversalOf` can only reference a non-reversal payment).
+  - Every reversal allocates a sequential receipt number from the same `receipt` counter series (`REC/FY/0001`).
+
+## 2. Transaction Boundaries
+- **Estimate Issuance Transaction:** Allocates `EST/FY/0001`, saves immutable snapshot, updates status to `ISSUED`, writes `ESTIMATE_ISSUE` audit log.
+- **Bill Creation Transaction:** Allocates `BILL/FY/0001`, updates Estimate to `CONVERTED` (if applicable), writes Bill. If initial payment provided, allocates `REC/FY/0001`, writes `Payment`, recomputes bill `paid` and `balance` in the EXACT same transaction. Mid-transaction failure rolls back bill, payment, and both counters with zero gaps.
+- **Payment Creation Transaction:** Queries existing payments, enforces `currentPaid + amount <= bill.total`, allocates `REC/FY/0001`, writes `Payment` with receipt snapshot, updates Bill `paid`, `balance`, `status`, and version (`$inc: { version: 1 }`), writes `PAYMENT_CREATE` audit log.
+- **Payment Reversal Transaction:** Reads original payment, asserts not already reversed, writes reversal `Payment` document with new `REC/FY/0001` and reversal snapshot, recomputes Bill via `recomputeBill`, updates Bill with version increment, writes `PAYMENT_REVERSE` audit log.
+
+## 3. Prevention of Overpayment and Concurrency Control
+- **No Overpayment:** `amount` must be > 0 and <= `bill.balance`. All calculations use integer paise.
+- **Concurrent Payment Protection:** Concurrent requests run in MongoDB multi-document transactions with primary read preference. Bill version check (`version === currentVersion`) and atomic update `$inc: { version: 1 }` prevents concurrent transactions from both committing when their combined sum exceeds balance. One succeeds, the second fails with HTTP 422/409.
+
+## 4. "One Active Bill Per Visit" Invariant
+- **Rule:** A visit can have at most one active (non-cancelled) bill.
+- **Implementation:** Explicit boolean `activeForVisit: true` on `Bill`.
+- **Database Index:**
+  `{ clinicId: 1, visitId: 1, activeForVisit: 1 }` with `{ unique: true, partialFilterExpression: { activeForVisit: true } }`.
+  - When bill is created: `activeForVisit: true`. Any parallel attempt for the same `visitId` hits MongoDB duplicate key error (11000) and returns HTTP 409.
+  - When bill is cancelled: `activeForVisit: false`. This releases the partial unique index, allowing a new bill to be created for the visit.
+
+## 5. Editing and Cancellation Invariants
+- **Bill Edit Lock:** Lines and discount can be edited ONLY when `net paid === 0` and bill is not cancelled, guarded by optimistic versioning (`version`). Once any payment exists, the bill is permanently locked.
+- **Correction Workflow:** To correct a locked bill, reverse all payments, cancel the bill with a reason, and create a new bill from the visit.
+- **Bill Cancellation:** Allowed ONLY when `net paid === 0`. Requires a reason. Leaves permanent record with status `CANCELLED`.
+
+## 6. Treatment Price Overrides & Audit
+- Lines store both `listPrice` and `unitPrice`.
+- Doctor price overrides are audited under `PRICE_OVERRIDE` recording line IDs and field names only (never amounts or patient PII).
+
+
