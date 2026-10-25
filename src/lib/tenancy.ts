@@ -227,8 +227,10 @@ export function tenancyPlugin(schema: Schema): void {
       throw new TenantContextMissingError('Tenant context missing for insertMany.');
     }
     const list = Array.isArray(docs) ? docs : [docs];
+    const ctxClinicIdStr = ctx.clinicId?.toString();
     for (const doc of list) {
-      if (doc.clinicId && !ctx.clinicId.equals(doc.clinicId)) {
+      const docClinicIdStr = doc.clinicId?.toString();
+      if (docClinicIdStr && docClinicIdStr !== ctxClinicIdStr) {
         throw new TenantIsolationViolationError('Cannot insert document with mismatched clinicId.');
       }
       doc.clinicId = ctx.clinicId;

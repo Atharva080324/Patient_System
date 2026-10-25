@@ -30,6 +30,12 @@ export default defineConfig({
         'src/lib/registration-service.ts',
         'src/lib/queue-service.ts',
         'src/lib/closing-report-service.ts',
+        'src/lib/fdi-tooth.ts',
+        'src/lib/case-sheet-service.ts',
+        'src/lib/prescription-service.ts',
+        'src/lib/prescription-snapshot.ts',
+        'src/lib/medicine-search.ts',
+        'src/lib/prescription-set-service.ts',
       ],
       thresholds: {
         perFile: true,

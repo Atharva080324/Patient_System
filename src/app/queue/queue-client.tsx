@@ -498,6 +498,13 @@ export function QueueClient() {
                         {/* IN_CONSULTATION state actions */}
                         {isInConsult && (
                           <>
+                            <Link
+                              id={`link-consult-${item.id}`}
+                              href={`/consult/${item.id}`}
+                              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold text-white bg-blue-600 hover:bg-blue-500 active:bg-blue-700 transition shadow-sm cursor-pointer"
+                            >
+                              Consult Workspace →
+                            </Link>
                             <button
                               id={`btn-complete-${item.id}`}
                               type="button"

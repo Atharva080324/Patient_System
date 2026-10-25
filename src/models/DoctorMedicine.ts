@@ -4,6 +4,7 @@ import { tenancyPlugin, TenantActor } from '../lib/tenancy';
 export interface IDoctorMedicine extends Document {
   clinicId: mongoose.Types.ObjectId;
   medicineId: mongoose.Types.ObjectId;
+  isFavorite?: boolean;
   useCount: number;
   lastUsedAt: Date;
   defaultFrequency?: string;
@@ -20,6 +21,7 @@ const DoctorMedicineSchema = new Schema<IDoctorMedicine>(
   {
     clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true, index: true },
     medicineId: { type: Schema.Types.ObjectId, ref: 'Medicine', required: true },
+    isFavorite: { type: Boolean, default: false },
     useCount: { type: Number, default: 0, required: true },
     lastUsedAt: { type: Date, required: true },
     defaultFrequency: { type: String },
@@ -43,7 +45,7 @@ const DoctorMedicineSchema = new Schema<IDoctorMedicine>(
 );
 
 DoctorMedicineSchema.index({ clinicId: 1, medicineId: 1 }, { unique: true });
-DoctorMedicineSchema.index({ clinicId: 1, useCount: -1 });
+DoctorMedicineSchema.index({ clinicId: 1, isFavorite: -1, useCount: -1 });
 
 DoctorMedicineSchema.plugin(tenancyPlugin);
 

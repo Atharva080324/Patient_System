@@ -105,13 +105,64 @@ async function main() {
         console.log(`Inserted visits batch up to ${limit}...`);
       }
     }
+
+    // Seed 5,000 FAKE-NAMED medicines for search performance benchmark
+    const Medicine = (await import('../src/models/Medicine')).Medicine;
+    const existingMeds = await Medicine.countDocuments({ clinicId, source: 'SAMPLE' });
+    const targetMedCount = isSmoke ? 100 : 5000;
+    if (existingMeds >= targetMedCount) {
+      console.log(`Perf medicines already seeded (${existingMeds}). Skipping.`);
+    } else {
+      console.log(`Generating ${targetMedCount} synthetic FAKE-NAMED medicines (source SAMPLE, verified=false)...`);
+      const forms = ['tablet', 'capsule', 'gel', 'ointment', 'mouthwash', 'drops'];
+      const prefixes = [
+        'Amoxi', 'Cipro', 'Paracet', 'Ibu', 'Metron', 'Clinda', 'Azithro',
+        'Diclo', 'Omepra', 'Doxy', 'Cepha', 'Erythro', 'Ketorol', 'Tramadol',
+        'Chlorhex', 'Povidone', 'Lidocaine', 'Articaine', 'Predni', 'Dexameth'
+      ];
+      const suffixes = [
+        'cillin', 'flox', 'amol', 'profen', 'idazole', 'mycin', 'fenac',
+        'zole', 'cycline', 'lexin', 'ac', 'idine', 'stat', 'quine', 'pine'
+      ];
+      const strengths = ['100 mg', '250 mg', '500 mg', '650 mg', '10 mg', '0.2%', '1%', '2%'];
+
+      const medBatch = [];
+      for (let m = 1; m <= targetMedCount; m++) {
+        const p = prefixes[m % prefixes.length];
+        const s = suffixes[Math.floor(m / prefixes.length) % suffixes.length];
+        const genericName = `${p}${s}-${m}`;
+        const brandName = `Brand-${p}${m}`;
+        const form = forms[m % forms.length];
+        const strength = strengths[m % strengths.length];
+
+        medBatch.push({
+          clinicId,
+          genericName,
+          brandName,
+          form,
+          strength,
+          category: 'Dental Sample Benchmark',
+          source: 'SAMPLE',
+          verified: false,
+          active: true,
+          createdBy: { type: 'SYSTEM', id: 'seed:perf' },
+        });
+
+        if (medBatch.length === 1000 || m === targetMedCount) {
+          await Medicine.insertMany(medBatch);
+          console.log(`Inserted medicines up to ${m}...`);
+          medBatch.length = 0;
+        }
+      }
+      console.log(`✓ ${targetMedCount} Synthetic medicines seeded for clinic.`);
+    }
   });
 
   await disconnectDb();
   console.log('Performance seed completed.');
 }
 
-if (require.main === module) {
+if (process.argv[1]?.replace(/\\/g, '/').includes('scripts/seed-perf')) {
   main().catch((err) => {
     console.error('Fatal error during perf seed:', err);
     process.exit(1);
