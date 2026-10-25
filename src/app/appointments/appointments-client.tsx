@@ -204,6 +204,17 @@ export default function AppointmentsClient() {
     return () => clearTimeout(timer);
   }, [patientQuery, createMode]);
 
+  // Handle Escape key to close modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setCreateModalOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   // Handle Book Appointment
   const handleCreateAppointment = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -926,7 +937,7 @@ export default function AppointmentsClient() {
                           Cancelled: {appt.cancelReason}
                         </div>
                       )}
-                      <div className="text-[10px] text-slate-500 uppercase">
+                      <div className="text-[10px] text-slate-400 uppercase">
                         Date: {appt.clinicDate} &bull; Source: {appt.source}
                       </div>
                     </div>
@@ -1072,7 +1083,7 @@ export default function AppointmentsClient() {
                       <div>
                         <span className="font-bold text-blue-300">{selectedPatient.name}</span>
                         <span className="text-slate-400 ml-2 font-mono">{selectedPatient.phone}</span>
-                        <span className="text-slate-500 ml-2 font-mono">({selectedPatient.patientCode})</span>
+                        <span className="text-slate-400 ml-2 font-mono">({selectedPatient.patientCode})</span>
                       </div>
                       <button
                         type="button"

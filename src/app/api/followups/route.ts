@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { connectDb } from '@/lib/db';
 import {
   listFollowUps,
   createFollowUp,
@@ -8,6 +9,7 @@ import {
 } from '@/lib/followup-service';
 
 export const GET = withAuth(async (req: NextRequest, { session }) => {
+  await connectDb();
   const url = new URL(req.url);
   const tab = (url.searchParams.get('tab') as FollowUpTab) || undefined;
   const patientId = url.searchParams.get('patientId') || undefined;
@@ -17,6 +19,7 @@ export const GET = withAuth(async (req: NextRequest, { session }) => {
 }, { roles: ['DOCTOR', 'STAFF', 'ADMIN'] });
 
 export const POST = withAuth(async (req: NextRequest, { session, user }) => {
+  await connectDb();
   const body = await req.json();
   const parsed = CreateFollowUpSchema.safeParse(body);
 

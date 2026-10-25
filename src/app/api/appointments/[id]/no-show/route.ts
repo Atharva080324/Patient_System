@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { connectDb } from '@/lib/db';
 import { markAppointmentNoShow } from '@/lib/appointment-service';
 
 export const POST = withAuth(async (req: NextRequest, { session, user }, context) => {
+  await connectDb();
   const { id } = await (context?.params as any);
   const actor = { type: 'USER' as const, id: user._id.toString() };
 

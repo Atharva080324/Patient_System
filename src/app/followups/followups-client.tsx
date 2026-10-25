@@ -439,7 +439,7 @@ export default function FollowUpsClient() {
                         </div>
                         <div className="text-xs text-slate-400 font-mono">
                           {item.patientId?.patientCode && (
-                            <span className="mr-2 text-slate-500">
+                            <span className="mr-2 text-slate-400">
                               #{item.patientId.patientCode}
                             </span>
                           )}
@@ -582,7 +582,7 @@ export default function FollowUpsClient() {
                     <div>
                       <span className="font-bold text-purple-300">{selectedPatient.name}</span>
                       <span className="text-slate-400 ml-2 font-mono">{selectedPatient.phone}</span>
-                      <span className="text-slate-500 ml-2 font-mono">({selectedPatient.patientCode})</span>
+                      <span className="text-slate-400 ml-2 font-mono">({selectedPatient.patientCode})</span>
                     </div>
                     <button
                       type="button"

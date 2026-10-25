@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { connectDb } from '@/lib/db';
 import {
   getAppointment,
   rescheduleAppointment,
@@ -10,6 +11,7 @@ import { AuditLog, AuditAction } from '@/models/AuditLog';
 import { clock } from '@/lib/clock';
 
 export const GET = withAuth(async (req: NextRequest, { session }, context) => {
+  await connectDb();
   const { id } = await (context?.params as any);
   const appointment = await getAppointment(session.clinicId, id);
 
@@ -21,6 +23,7 @@ export const GET = withAuth(async (req: NextRequest, { session }, context) => {
 }, { roles: ['DOCTOR', 'STAFF', 'ADMIN'] });
 
 export const PATCH = withAuth(async (req: NextRequest, { session, user }, context) => {
+  await connectDb();
   const { id } = await (context?.params as any);
   const body = await req.json();
 

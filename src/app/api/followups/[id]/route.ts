@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { connectDb } from '@/lib/db';
 import {
   updateFollowUp,
   softDeleteFollowUp,
@@ -7,6 +8,7 @@ import {
 } from '@/lib/followup-service';
 
 export const PATCH = withAuth(async (req: NextRequest, { session, user }, context) => {
+  await connectDb();
   const { id } = await (context?.params as any);
   const body = await req.json();
 
@@ -26,6 +28,7 @@ export const PATCH = withAuth(async (req: NextRequest, { session, user }, contex
 }, { roles: ['DOCTOR', 'STAFF', 'ADMIN'] });
 
 export const DELETE = withAuth(async (req: NextRequest, { session, user }, context) => {
+  await connectDb();
   const { id } = await (context?.params as any);
   const actor = { type: 'USER' as const, id: user._id.toString() };
 

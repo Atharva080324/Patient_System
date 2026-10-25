@@ -253,4 +253,48 @@
 - **Secret Storage:** Generated via `pnpm integration:create-key`, secret printed once to stdout. Stored as Argon2id hash in `IntegrationKey` collection.
 - **Busy Endpoint Privacy:** `GET /api/integrations/busy?from=&to=` returns ONLY an array of `{ start, end }` ISO strings for active appointments. Names, phones, and IDs are strictly excluded.
 
+---
+
+# Phase 6: Patients, Patient Profile, Timeline, CSV Export & Dashboard Assumptions
+
+## 1. Patient Search Design & Text Indexing
+- **Search Architecture:** Search supports prefix matching across Name (including Devanagari script), Phone, and Patient Code.
+- **Normalized Name Field (`searchName`):** Because MongoDB text indexes do not support prefix matching (`^`), `Patient` maintains an indexed `searchName` field (lowercased, trimmed, multiple whitespace collapsed). Name queries execute as anchored regexes `^...` over `searchName`.
+- **Query Input Sanitization:** All search inputs are passed through the Phase 1 plain-input guard. Regex metacharacters (`.*`, `(`, `\`, `^`, `$`, `[`, `]`, `?`, `+`) are escaped with `escapeRegex()`, preventing ReDoS and accidental full-collection scans. Complex MongoDB query operators (e.g. `{"$ne": null}`) are strictly rejected.
+- **Phone & Code Normalization:**
+  - Phone numbers are normalized using the Indian mobile logic (`indianMobile`). Input forms (+91, 0 prefix, 10-digit, or trailing 4+ digits) query indexed `phone` field.
+  - Patient code queries match exact or case-insensitive code patterns (`P-000123`, `p-123`, `123`).
+- **Privacy & Redaction:** Patient search terms are classified as PII and are strictly excluded from server logs and audit entries.
+- **Performance Guarantee:** Query plan uses indexed searches (`{ clinicId: 1, isDeleted: 1, searchName: 1 }`, `{ clinicId: 1, phone: 1 }`, `{ clinicId: 1, patientCode: 1 }`). No `COLLSCAN` is permitted. Response p95 < 100ms on 5,000 patients.
+
+## 2. Patient Profile, Age Display & Edit Invariants
+- **No Delete or Merge in v1:** In v1, patients cannot be merged or deleted through the UI. Any future deletion will be soft-delete via `isDeleted: true`.
+- **Age Display Rule:**
+  - If only `ageYears` is recorded: display as `"Age <X> (as recorded on <date>)"`. The system NEVER auto-increments recorded age.
+  - If `dob` is recorded: age is computed dynamically at render time using `clock.now()`.
+- **Optimistic Concurrency Control:** Patient document edits require `version === currentVersion`. Concurrent edits return HTTP 409 Conflict.
+- **Immutability Invariants:** `patientCode` and `clinicId` are strictly immutable once created.
+- **Duplicate Detection on Update:** When `name` or `phone` is edited, Phase 2 duplicate detection is automatically re-evaluated. If duplicate score is high, a duplicate banner is shown. The doctor may dismiss the warning (`DUPLICATE_DISMISS` audit), which is reversible upon subsequent detection.
+- **Audit Logging:** Opening a patient profile logs `PATIENT_VIEW` (id only). Editing logs `PATIENT_UPDATE` (changed field names only, never field values or PII).
+
+## 3. Timeline Architecture
+- **Unified Chronological Feed:** Assembles items across Visits, Case Sheets, Prescriptions, Estimates, Bills, Payments (with Reversals), Appointments, and FollowUps in descending chronological order (`newest first`).
+- **Status & Integrity Flags:** VOID prescriptions and reversed payments are clearly badged.
+- **Cursor Pagination:** Paginates using `(timestamp, _id)` cursors with page limit (e.g. 15 items) and "Load more" action. Never loads an entire lifetime record into serverless memory.
+- **Performance Target:** Profile page 1 load < 300ms server time for patients with 50+ visits.
+
+## 4. CSV Export & Formula Injection (CWE-1236) Protection
+- **Security & Authorization:** Doctor-only endpoint, rate-limited, requiring re-authentication via password confirmation within the last 5 minutes.
+- **Audit:** Audited under `PATIENT_EXPORT` with row count and filtered field names (never field values).
+- **RFC 4180 Compliance:** UTF-8 BOM (`\uFEFF`) prepended for seamless Microsoft Excel rendering (including Devanagari script). CRLF line terminators (`\r\n`). Fields containing quotes, commas, or line breaks are wrapped in double quotes; inner quotes are escaped as `""`.
+- **Formula Injection Mitigation:** Any text cell beginning with `=`, `+`, `-`, `@`, `\t` (Tab), or `\r` (Carriage Return) is prepended with a single quote (`'`). Plain numeric columns (phone numbers, currency amounts in rupees) are output as digits without alteration to preserve numeric parsing.
+- **Hard Cap & Streaming:** Capped at 20,000 rows. Response is streamed in chunks to ensure flat memory overhead. Filename is `patients-YYYY-MM-DD.csv` evaluated in Asia/Kolkata from the Clock.
+
+## 5. Dashboard Aggregation & Invariants
+- **Doctor-Only Realtime Dashboard:** Displays today's operational summary based on `clinicDate(clock.now())` in Asia/Kolkata.
+- **Reconciliation Invariant:** All dashboard figures (visits by state, appointments, follow-ups, net collections via `collectionsForDay`, and outstanding balance) match raw database query totals.
+- **Zero In-Memory Cache:** All metrics are fetched via indexed MongoDB pipelines and `Promise.all` parallelism to respect serverless lifecycle and multi-instance concurrency.
+- **Auto-Refresh:** Frontend auto-refreshes every 60 seconds when active; pauses on tab visibility hidden.
+
+
 

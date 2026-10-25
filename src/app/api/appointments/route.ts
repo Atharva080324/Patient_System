@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/auth';
+import { connectDb } from '@/lib/db';
 import {
   createAppointment,
   listAppointments,
@@ -10,6 +11,7 @@ import { AuditLog, AuditAction } from '@/models/AuditLog';
 import { clock } from '@/lib/clock';
 
 export const GET = withAuth(async (req: NextRequest, { session, user }) => {
+  await connectDb();
   const url = new URL(req.url);
   const dateFrom = url.searchParams.get('dateFrom') || undefined;
   const dateTo = url.searchParams.get('dateTo') || undefined;
@@ -44,6 +46,7 @@ export const GET = withAuth(async (req: NextRequest, { session, user }) => {
 }, { roles: ['DOCTOR', 'STAFF', 'ADMIN'] });
 
 export const POST = withAuth(async (req: NextRequest, { session, user }) => {
+  await connectDb();
   const body = await req.json();
   const parsed = CreateAppointmentSchema.safeParse(body);
 
