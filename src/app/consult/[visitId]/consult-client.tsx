@@ -169,6 +169,17 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
   // Tab navigation inside consult screen
   const [activeTab, setActiveTab] = useState<'casesheet' | 'prescription'>('casesheet');
 
+  // Quick Follow-up modal
+  const [showQuickFollowUpModal, setShowQuickFollowUpModal] = useState(false);
+  const [quickFollowUpDueDate, setQuickFollowUpDueDate] = useState(() => {
+    const nextWeek = new Date(clock.now().getTime() + 7 * 24 * 3600 * 1000 + 5.5 * 3600 * 1000);
+    return nextWeek.toISOString().slice(0, 10);
+  });
+  const [quickFollowUpReason, setQuickFollowUpReason] = useState('Routine review / post-treatment check');
+  const [quickFollowUpNote, setQuickFollowUpNote] = useState('');
+  const [quickFollowUpSaving, setQuickFollowUpSaving] = useState(false);
+
+
   // Debounce ref
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDoneRef = useRef(false);
@@ -795,6 +806,14 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
             </div>
 
             {/* Phase 4 Billing & Estimate Entry Points */}
+            <button
+              id="btn-consult-add-followup"
+              type="button"
+              onClick={() => setShowQuickFollowUpModal(true)}
+              className="px-3.5 py-2 rounded-lg bg-purple-700 hover:bg-purple-600 text-white text-xs font-semibold shadow-sm transition cursor-pointer"
+            >
+              + Follow-up
+            </button>
             <Link
               id="btn-consult-create-estimate"
               href={`/billing/estimates/new?visitId=${visit._id}&patientId=${patient._id}`}
@@ -2082,6 +2101,122 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
               </button>
             </div>
           </form>
+        </div>
+      )}
+      {/* Quick Add Follow-up Modal */}
+      {showQuickFollowUpModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modal-quick-followup-title"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+        >
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+              <h3 id="modal-quick-followup-title" className="text-base font-bold text-white">
+                Add Follow-up for {patient.name}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setShowQuickFollowUpModal(false)}
+                className="text-slate-400 hover:text-white text-lg font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setQuickFollowUpSaving(true);
+                try {
+                  const res = await fetch('/api/followups', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      patientId: patient._id,
+                      sourceVisitId: visit._id,
+                      dueDate: quickFollowUpDueDate,
+                      reason: quickFollowUpReason.trim(),
+                      note: quickFollowUpNote.trim() || undefined,
+                    }),
+                  });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    alert(data.error || 'Failed to schedule follow-up');
+                    return;
+                  }
+                  alert('Follow-up scheduled successfully!');
+                  setShowQuickFollowUpModal(false);
+                } catch (err: any) {
+                  alert(err.message || 'Error creating follow-up');
+                } finally {
+                  setQuickFollowUpSaving(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label htmlFor="quick-followup-due-date" className="block text-xs font-semibold text-slate-300 mb-1">
+                  Due Date (YYYY-MM-DD) *
+                </label>
+                <input
+                  id="quick-followup-due-date"
+                  type="date"
+                  required
+                  value={quickFollowUpDueDate}
+                  onChange={(e) => setQuickFollowUpDueDate(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="quick-followup-reason" className="block text-xs font-semibold text-slate-300 mb-1">
+                  Reason *
+                </label>
+                <input
+                  id="quick-followup-reason"
+                  type="text"
+                  required
+                  value={quickFollowUpReason}
+                  onChange={(e) => setQuickFollowUpReason(e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="quick-followup-note" className="block text-xs font-semibold text-slate-300 mb-1">
+                  Note (Optional)
+                </label>
+                <textarea
+                  id="quick-followup-note"
+                  rows={2}
+                  value={quickFollowUpNote}
+                  onChange={(e) => setQuickFollowUpNote(e.target.value)}
+                  placeholder="Additional notes for clinical team..."
+                  className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-100"
+                />
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowQuickFollowUpModal(false)}
+                  className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  id="btn-submit-quick-followup"
+                  type="submit"
+                  disabled={quickFollowUpSaving}
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-xs font-bold text-white shadow cursor-pointer disabled:opacity-50"
+                >
+                  {quickFollowUpSaving ? 'Saving...' : 'Add Follow-up'}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

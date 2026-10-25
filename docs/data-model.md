@@ -72,18 +72,30 @@ Every document contains:
   - `{ name: 'text', phone: 'text', patientCode: 'text' }` (text search)
 
 ### `appointments`
-- Fields: `clinicId`, `patientId`, `doctorId`, `start`, `durationMinutes`, `status` (SCHEDULED/CONFIRMED/COMPLETED/CANCELLED/NO_SHOW), `type` (CONSULTATION/PROCEDURE/FOLLOWUP/EMERGENCY), `notes?`, `source` (MANUAL/KIOSK/ONLINE), `externalId?`, `deletedAt?`
+- Fields: `clinicId`, `patientId?` (ObjectId, linked on check-in), `contactName`, `contactPhone`, `start` (Date), `end` (Date), `clinicDate` (YYYY-MM-DD in Asia/Kolkata), `status` (BOOKED/CHECKED_IN/CANCELLED/NO_SHOW), `reason`, `treatmentCode?`, `source` (MANUAL/WEBSITE/WHATSAPP), `externalId?`, `notes?`, `version` (integer, optimistic concurrency), `checkedInVisitId?`, `cancelReason?`, `deletedAt?`
+- State Machine: BOOKED → CHECK_IN → CHECKED_IN, BOOKED → CANCEL → CANCELLED, BOOKED → NO_SHOW → NO_SHOW, BOOKED → RESCHEDULE → BOOKED. CHECKED_IN, CANCELLED, NO_SHOW are terminal.
+- Slot Constraints: 30-minute grid-aligned (`:00`/`:30`), operating hours 09:00–20:00 IST, not in the past.
+- Overlap Check: Active appointments (non-CANCELLED, non-NO_SHOW) with overlapping `[start, end)` in same clinic rejected with 409 SLOT_TAKEN.
+- Concurrency: `SlotLock` per clinic per day with `$inc: { version: 1 }` inside MongoDB transaction.
 - Indexes:
-  - `{ clinicId: 1, start: 1 }`
-  - `{ clinicId: 1, source: 1, externalId: 1 }` (unique, sparse)
+  - `{ clinicId: 1, start: 1, end: 1 }`
+  - `{ clinicId: 1, clinicDate: 1, status: 1 }`
+  - `{ clinicId: 1, source: 1, externalId: 1 }` (unique, partialFilterExpression: `{ externalId: { $type: 'string' } }`)
+
+### `slotLocks`
+- Fields: `clinicId`, `clinicDate` (YYYY-MM-DD), `version` (integer)
+- Purpose: Per-clinic-per-day optimistic concurrency lock for appointment slot operations.
+- Indexes:
+  - `{ clinicId: 1, clinicDate: 1 }` (unique)
 
 ### `visits`
-- Fields: `clinicId`, `patientId`, `date` (YYYY-MM-DD), `token` (integer), `type` (WALK_IN/APPOINTMENT), `status` (WAITING/IN_CONSULTATION/COMPLETED/SKIPPED/NO_SHOW/CANCELLED), `checkInAt`, `startedAt?`, `completedAt?`, `skippedAt?`, `noShowAt?`, `cancelledAt?`, `reasonForVisit`, `caseSheet`, `version`, `createdBy`
+- Fields: `clinicId`, `patientId`, `date` (YYYY-MM-DD), `token` (integer), `type` (WALK_IN/APPOINTMENT), `status` (WAITING/IN_CONSULTATION/COMPLETED/SKIPPED/NO_SHOW/CANCELLED), `appointmentId?`, `checkInAt`, `startedAt?`, `completedAt?`, `skippedAt?`, `noShowAt?`, `cancelledAt?`, `reasonForVisit`, `caseSheet`, `version`, `createdBy`
 - Invariants: Only ONE visit per clinic can be `IN_CONSULTATION` at any time (enforced via partial unique index). Terminal states (`COMPLETED`, `NO_SHOW`, `CANCELLED`) cannot transition.
 - Indexes:
   - `{ clinicId: 1, date: 1, token: 1 }` (unique)
   - `{ clinicId: 1, patientId: 1, date: 1 }`
   - `{ clinicId: 1, status: 1 }` (unique, partial: `{ status: 'IN_CONSULTATION' }`)
+  - `{ clinicId: 1, appointmentId: 1 }` (unique, partialFilterExpression: `{ appointmentId: { $exists: true } }`)
 
 ### `idempotencyKeys`
 - Fields: `clinicId`, `key`, `status` (PROCESSING/COMPLETED), `response?`, `createdAt`
@@ -158,9 +170,25 @@ Every document contains:
   - `{ clinicId: 1, receivedAt: 1 }`
 
 ### `followUps`
-- Fields: `clinicId`, `patientId`, `doctorId`, `dueDate`, `reason`, `status` (SCHEDULED/COMPLETED/CANCELLED/RESCHEDULED), `notes?`, `deletedAt?`
+- Fields: `clinicId`, `patientId`, `sourceVisitId?`, `dueDate` (YYYY-MM-DD string), `reason`, `status` (PENDING/DONE/CANCELLED), `doneAt?`, `note?`, `deletedAt?`
+- Dynamic Category: `OVERDUE` is **never stored**; computed at query time by comparing `dueDate` against today in `Asia/Kolkata`: if `dueDate < today` and status is `PENDING` → `OVERDUE`; if `dueDate === today` → `TODAY`; if `dueDate > today` → `UPCOMING`; if status is `DONE` or `CANCELLED` → `DONE`.
 - Indexes:
   - `{ clinicId: 1, dueDate: 1, status: 1 }`
+  - `{ clinicId: 1, patientId: 1, status: 1 }`
+
+### `integrationKeys`
+- Fields: `clinicId`, `keyId` (unique string), `encryptedSecret` (AES-256-GCM encrypted), `name`, `active` (boolean)
+- Purpose: Stores HMAC signing keys for external integration partners. Secrets encrypted at rest.
+- Indexes:
+  - `{ keyId: 1 }` (unique)
+  - `{ clinicId: 1, active: 1 }`
+
+### `integrationReplays`
+- Fields: `sigHash` (SHA-256 of the signature hex), `createdAt`
+- Purpose: 10-minute replay cache preventing duplicate HMAC signatures.
+- Indexes:
+  - `{ sigHash: 1 }` (unique)
+  - `{ createdAt: 1 }` (TTL: 600 seconds / 10 minutes)
 
 ### `counters`
 - Fields: `_id` (`${clinicId}:${key}`), `sequence` (integer), `updatedAt`

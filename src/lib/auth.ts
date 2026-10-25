@@ -444,7 +444,8 @@ export function publicRoute(handler: PublicHandler) {
       return await handler(req, context);
     } catch (err: any) {
       console.error('publicRoute error:', err);
-      return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+      const status = typeof err.statusCode === 'number' ? err.statusCode : 500;
+      return NextResponse.json({ error: err.message || 'Internal Server Error' }, { status });
     }
   };
 }

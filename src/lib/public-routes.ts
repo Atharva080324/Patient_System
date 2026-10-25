@@ -8,6 +8,9 @@ export const PUBLIC_ROUTES_ALLOWLIST: string[] = [
   '/api/auth/login',
   '/api/auth/login-2fa',
   '/api/kiosk/unlock',
+  '/api/integrations/appointments',
+  '/api/integrations/appointments/[externalId]',
+  '/api/integrations/busy',
 ];
 
 export function isAllowedPublicRoute(pathname: string): boolean {

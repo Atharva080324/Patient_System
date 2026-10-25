@@ -183,6 +183,22 @@ export function QueueClient() {
             </button>
 
             <Link
+              id="link-appointments"
+              href="/appointments"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm"
+            >
+              Appointments
+            </Link>
+
+            <Link
+              id="link-followups"
+              href="/followups"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white transition shadow-sm"
+            >
+              Follow-ups
+            </Link>
+
+            <Link
               id="link-billing"
               href="/billing"
               className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white transition shadow-sm"
@@ -193,7 +209,7 @@ export function QueueClient() {
             <Link
               id="link-closing-report"
               href="/reports/closing"
-              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-500 text-white transition shadow-sm"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 transition shadow-sm"
             >
               Closing Report
             </Link>

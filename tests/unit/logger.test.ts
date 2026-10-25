@@ -67,4 +67,29 @@ describe('A17: Structured Logger & Data Redaction', () => {
     expect(entry.phone).toBe('[REDACTED]');
     expect(entry.timestamp).toBeDefined();
   });
+
+  it('E12: redacts integration secrets, HMAC signatures, and appointment contact details', () => {
+    const input = {
+      secret: 'super_secret_integration_key_hex_123',
+      signature: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      encryptedSecret: 'iv:tag:data_hex',
+      contactName: 'Mr. Patient Contact',
+      contactPhone: '9822112233',
+      appointmentId: '6523abc12345678901234599',
+      externalId: 'ext_whatsapp_456',
+    };
+
+    const redacted = redactSensitiveData(input) as any;
+
+    expect(redacted.secret).toBe('[REDACTED]');
+    expect(redacted.signature).toBe('[REDACTED]');
+    expect(redacted.encryptedSecret).toBe('[REDACTED]');
+    expect(redacted.contactName).toBe('[REDACTED]');
+    expect(redacted.contactPhone).toBe('[REDACTED]');
+
+    // Non-PII IDs preserved
+    expect(redacted.appointmentId).toBe('6523abc12345678901234599');
+    expect(redacted.externalId).toBe('ext_whatsapp_456');
+  });
 });
+

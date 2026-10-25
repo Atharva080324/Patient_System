@@ -43,6 +43,10 @@ export default defineConfig({
         'src/lib/estimate-state-machine.ts',
         'src/lib/estimate-to-bill.ts',
         'src/lib/payment-service.ts',
+        'src/lib/appointment-state-machine.ts',
+        'src/lib/appointment-service.ts',
+        'src/lib/followup-service.ts',
+        'src/lib/hmac.ts',
       ],
       thresholds: {
         perFile: true,

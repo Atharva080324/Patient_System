@@ -1,3 +1,6 @@
+import { Types } from 'mongoose';
+import { Patient } from '../models/Patient';
+
 export interface ExistingPatientCandidate {
   _id: string;
   patientCode: string;
@@ -254,3 +257,44 @@ export function evaluateDuplicate(
     similarityScore: bestScore,
   };
 }
+
+export async function detectDuplicate(
+  clinicId: Types.ObjectId,
+  input: { name: string; phone: string; ageYears?: number; dob?: string }
+): Promise<{
+  matchType: 'NEW_PATIENT' | 'RETURNING_PATIENT';
+  existingPatientId?: string;
+  existingPatientCode?: string;
+  possibleDuplicateOf?: string;
+  reason: string;
+}> {
+  const normalizedPhone = normalizePhone(input.phone);
+  const existingPatients = await Patient.find({
+    clinicId,
+    phone: normalizedPhone,
+    deletedAt: { $exists: false },
+  })
+    .select('_id patientCode name phone ageYears dob')
+    .lean();
+
+  const decision = evaluateDuplicate(
+    input,
+    existingPatients.map((p) => ({
+      _id: p._id.toString(),
+      patientCode: p.patientCode,
+      name: p.name,
+      phone: p.phone,
+      ageYears: p.ageYears,
+      dob: p.dob,
+    }))
+  );
+
+  return {
+    matchType: decision.action,
+    existingPatientId: decision.matchedPatientId,
+    existingPatientCode: decision.matchedPatientCode,
+    possibleDuplicateOf: decision.possibleDuplicateOfId,
+    reason: decision.reason,
+  };
+}
+

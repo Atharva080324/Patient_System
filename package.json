@@ -16,7 +16,8 @@
     "seed:perf": "tsx scripts/seed-perf.ts",
     "db:sync-indexes": "tsx scripts/sync-indexes.ts",
     "admin:create": "tsx scripts/admin-create.ts",
-    "admin:reset-password": "tsx scripts/admin-reset-password.ts"
+    "admin:reset-password": "tsx scripts/admin-reset-password.ts",
+    "integration:create-key": "tsx scripts/integration-create-key.ts"
   },
   "dependencies": {
     "@node-rs/argon2": "^2.2.2",

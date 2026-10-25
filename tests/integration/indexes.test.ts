@@ -283,10 +283,12 @@ describe('A15: Index Synchronization & Unique Index Enforcements', () => {
   it('unique sparse index rejects duplicate appointment externalId for same source', async () => {
     await runWithTenantContext({ clinicId, actor }, async () => {
       await Appointment.create({
-        contact: { name: 'Ext Booking', phone: '9822000005' },
+        contactName: 'Ext Booking',
+        contactPhone: '9822000005',
         start: new Date('2026-10-25T10:00:00.000Z'),
         end: new Date('2026-10-25T10:30:00.000Z'),
-        status: 'REQUESTED',
+        clinicDate: '2026-10-25',
+        status: 'BOOKED',
         reason: 'Consultation',
         source: 'WEBSITE',
         externalId: 'WEB-BOOKING-999',
@@ -295,10 +297,12 @@ describe('A15: Index Synchronization & Unique Index Enforcements', () => {
       // Duplicate externalId from same source
       await expect(
         Appointment.create({
-          contact: { name: 'Ext Booking 2', phone: '9822000006' },
+          contactName: 'Ext Booking 2',
+          contactPhone: '9822000006',
           start: new Date('2026-10-25T11:00:00.000Z'),
           end: new Date('2026-10-25T11:30:00.000Z'),
-          status: 'REQUESTED',
+          clinicDate: '2026-10-25',
+          status: 'BOOKED',
           reason: 'Consultation 2',
           source: 'WEBSITE',
           externalId: 'WEB-BOOKING-999',

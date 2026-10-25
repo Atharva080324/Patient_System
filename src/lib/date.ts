@@ -54,3 +54,14 @@ export function financialYear(instant: Date | number | string = new Date()): str
   const endYearFormatted = endYearShort.toString().padStart(2, '0');
   return `${startYear}-${endYearFormatted}`;
 }
+
+/**
+ * Returns { hour, minute } for an instant evaluated in Asia/Kolkata.
+ */
+export function clinicHourMinute(instant: Date | number | string): { hour: number; minute: number } {
+  const d = new Date(instant);
+  const hourStr = formatInTimeZone(d, CLINIC_TIMEZONE, 'HH');
+  const minStr = formatInTimeZone(d, CLINIC_TIMEZONE, 'mm');
+  return { hour: parseInt(hourStr, 10), minute: parseInt(minStr, 10) };
+}
+

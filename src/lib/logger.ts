@@ -27,6 +27,11 @@ const REDACTED_KEYS = new Set([
   'findings',
   'procedurerecords',
   'casesheet',
+  'secret',
+  'signature',
+  'encryptedsecret',
+  'contactname',
+  'contactphone',
 ]);
 
 export function redactSensitiveData(obj: unknown): unknown {

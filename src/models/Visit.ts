@@ -134,6 +134,11 @@ VisitSchema.index(
   { clinicId: 1, status: 1 },
   { unique: true, partialFilterExpression: { status: 'IN_CONSULTATION' } }
 );
+// Exactly one visit per appointment invariant:
+VisitSchema.index(
+  { clinicId: 1, appointmentId: 1 },
+  { unique: true, partialFilterExpression: { appointmentId: { $exists: true } } }
+);
 
 VisitSchema.plugin(tenancyPlugin);
 

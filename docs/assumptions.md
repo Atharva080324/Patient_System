@@ -222,4 +222,35 @@
 - Lines store both `listPrice` and `unitPrice`.
 - Doctor price overrides are audited under `PRICE_OVERRIDE` recording line IDs and field names only (never amounts or patient PII).
 
+---
+
+# Phase 5: Appointments, Follow-ups, and Integration Endpoint Assumptions
+
+## 1. Appointment State Machine & Transition Rules
+- **States:** `BOOKED` -> `CHECKED_IN`, `CANCELLED`, `NO_SHOW`.
+- `CHECKED_IN`, `CANCELLED`, and `NO_SHOW` are terminal. Rescheduling changes `start`/`end` while `BOOKED` guarded by `version` check and audit entry; there is no separate `RESCHEDULED` state.
+- Illegal transitions throw and return HTTP 409 Conflict.
+
+## 2. Slot Geometry & Clinic Operating Hours
+- **Default Slot Length:** 30 minutes (`DEFAULT_SLOT_MINUTES = 30`). All starts must align to 30-minute grid multiples (:00 or :30).
+- **Clinic Hours:** 09:00 to 20:00 in Asia/Kolkata (`CLINIC_OPEN_HOUR = 9`, `CLINIC_CLOSE_HOUR = 20`). Bookings outside operating hours or starting in the past (measured against Clock) are rejected with HTTP 422.
+- **Double-Booking Prevention:** Enforced inside a MongoDB transaction by atomically writing to a per-clinic-per-day lock (`SlotLock` document keyed by `clinicId` and `clinicDate` updated with `$inc`), then querying for overlapping active (`BOOKED` or `CHECKED_IN`) appointments where `start < newEnd && end > newStart`. Overlaps return HTTP 409 `SLOT_TAKEN`. No override permitted in v1.
+
+## 3. Check-In & Queue Idempotency
+- **Today-Only Rule:** Check-in requires `clinicDate(appointment.start) === clinicDate(clock.now())`. Future or past dates return HTTP 422.
+- **Idempotency Invariant:** Check-in transitions appointment atomically (`status: 'BOOKED'` -> `'CHECKED_IN'`) and inserts exactly ONE visit with next token. Enforced via unique partial index on `visits.appointmentId` (`{ partialFilterExpression: { appointmentId: { $exists: true } } }`). Parallel calls return `{ alreadyCheckedIn: true, visit }` with HTTP 200.
+- **Unlinked Patient Registration:** If an appointment has no `patientId`, P2 duplicate detector checks phone and name. High-confidence match auto-links; otherwise, requires age/DOB and sex, creating patient with `consentTextVersion = '1.0-staff'`.
+
+## 4. Follow-Up Computing Invariant
+- **Status:** `PENDING`, `DONE`, `CANCELLED`.
+- **Dynamic Overdue Calculation:** `OVERDUE` is NEVER stored in the database. A follow-up is overdue if and only if `status === 'PENDING'` and `dueDate < clinicDate(clock.now())` evaluated in `Asia/Kolkata`.
+- **Prescription Free-Text Policy:** System does not parse free-text follow-up fields from prescriptions. Follow-ups are created via structured dialogs.
+
+## 5. Integration Auth & Replay Protection
+- **HMAC Authentication:** Header `X-Signature` is hex HMAC-SHA256 over `${timestamp}.${method}.${pathAndQuery}.${rawBody}` using integration secret. Constant-time comparison prevents timing attacks.
+- **Timestamp Window:** ±5 minutes compared to Clock. Stale or future timestamps return HTTP 401.
+- **Replay Protection:** Accepted signature hashes are stored in `IntegrationReplay` with 10-minute TTL index. Duplicates inside window return HTTP 401.
+- **Secret Storage:** Generated via `pnpm integration:create-key`, secret printed once to stdout. Stored as Argon2id hash in `IntegrationKey` collection.
+- **Busy Endpoint Privacy:** `GET /api/integrations/busy?from=&to=` returns ONLY an array of `{ start, end }` ISO strings for active appointments. Names, phones, and IDs are strictly excluded.
+
 

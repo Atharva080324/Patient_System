@@ -1,16 +1,17 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 import { tenancyPlugin, TenantActor } from '../lib/tenancy';
 
-export type FollowUpStatus = 'PENDING' | 'DONE' | 'MISSED' | 'CANCELLED';
+export type FollowUpStatus = 'PENDING' | 'DONE' | 'CANCELLED';
 
 export interface IFollowUp extends Document {
   clinicId: mongoose.Types.ObjectId;
   patientId: mongoose.Types.ObjectId;
-  visitId: mongoose.Types.ObjectId;
+  sourceVisitId?: mongoose.Types.ObjectId;
   dueDate: string; // YYYY-MM-DD
   reason: string;
   status: FollowUpStatus;
-  contactedAt?: Date;
+  doneAt?: Date;
+  note?: string;
   deletedAt?: Date;
   schemaVersion: number;
   createdBy: TenantActor;
@@ -22,16 +23,18 @@ const FollowUpSchema = new Schema<IFollowUp>(
   {
     clinicId: { type: Schema.Types.ObjectId, ref: 'Clinic', required: true, index: true },
     patientId: { type: Schema.Types.ObjectId, ref: 'Patient', required: true, index: true },
-    visitId: { type: Schema.Types.ObjectId, ref: 'Visit', required: true, index: true },
-    dueDate: { type: String, required: true }, // "YYYY-MM-DD"
-    reason: { type: String, required: true },
+    sourceVisitId: { type: Schema.Types.ObjectId, ref: 'Visit', index: true },
+    dueDate: { type: String, required: true, index: true }, // "YYYY-MM-DD"
+    reason: { type: String, required: true, trim: true },
     status: {
       type: String,
-      enum: ['PENDING', 'DONE', 'MISSED', 'CANCELLED'],
+      enum: ['PENDING', 'DONE', 'CANCELLED'],
       default: 'PENDING',
       required: true,
+      index: true,
     },
-    contactedAt: { type: Date },
+    doneAt: { type: Date },
+    note: { type: String, trim: true },
     deletedAt: { type: Date },
     schemaVersion: { type: Number, default: 1 },
     createdBy: {
@@ -49,9 +52,8 @@ const FollowUpSchema = new Schema<IFollowUp>(
   }
 );
 
-// Index:
-// followUps {clinicId, dueDate, status};
 FollowUpSchema.index({ clinicId: 1, dueDate: 1, status: 1 });
+FollowUpSchema.index({ clinicId: 1, patientId: 1, status: 1 });
 
 FollowUpSchema.plugin(tenancyPlugin);
 
