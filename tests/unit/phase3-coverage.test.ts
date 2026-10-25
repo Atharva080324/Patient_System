@@ -184,6 +184,59 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
       });
     });
 
+    it('handles race condition when CaseSheet.create throws code 11000 duplicate key', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const dummyVisit = await Visit.create({
+          clinicId,
+          patientId: testPatient._id,
+          date: '2026-10-25',
+          token: 399,
+          type: 'WALK_IN',
+          status: 'COMPLETED',
+          checkInAt: clock.now(),
+          reasonForVisit: 'Race test',
+          version: 1,
+          createdBy: doctorActor,
+        });
+
+        // Pre-create the case sheet so findOne on recovery finds it
+        const preCreated = await CaseSheet.create({
+          clinicId,
+          visitId: dummyVisit._id,
+          patientId: testPatient._id,
+          version: 1,
+          chiefComplaint: 'Pre-created',
+          createdBy: doctorActor,
+        });
+
+        // Mock findOne to return null on the initial check (lines 37-40), but allow subsequent findOne to find it
+        const originalFindOne = CaseSheet.findOne.bind(CaseSheet);
+        let findOneCount = 0;
+        const spyFindOne = vi.spyOn(CaseSheet, 'findOne').mockImplementation((...args: any[]) => {
+          findOneCount++;
+          if (findOneCount === 1) {
+            return {
+              session: () => Promise.resolve(null),
+              then: (resolve: any) => Promise.resolve(null).then(resolve),
+            } as any;
+          }
+          return (originalFindOne as any)(...args);
+        });
+
+        const dupError: any = new Error('E11000 duplicate key');
+        dupError.code = 11000;
+        const spyCreate = vi.spyOn(CaseSheet, 'create').mockRejectedValueOnce(dupError);
+
+        const recovered = await getOrCreateCaseSheet(clinicId, dummyVisit._id, doctorActor);
+        expect(recovered._id.toString()).toBe(preCreated._id.toString());
+
+        spyFindOne.mockRestore();
+        spyCreate.mockRestore();
+        await CaseSheet.deleteMany({ visitId: dummyVisit._id });
+        await Visit.deleteMany({ _id: dummyVisit._id });
+      });
+    });
+
     it('syncs updated allergies to Patient record', async () => {
       await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
         const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
@@ -232,6 +285,144 @@ describe('Phase 3 Core Modules: 90% Per-File Coverage Hardening', () => {
 
         const sheet = await getOrCreateCaseSheet(clinicId, visitNoHist._id, doctorActor);
         expect(sheet.allergies).toEqual([]);
+        expect(sheet.chiefComplaint).toBe('General checkup');
+      });
+    });
+
+    it('creates case sheet when patient record is null or missing', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const dummyVisit = await Visit.create({
+          clinicId,
+          patientId: new mongoose.Types.ObjectId(),
+          date: '2026-10-25',
+          token: 386,
+          type: 'WALK_IN',
+          status: 'WAITING',
+          reasonForVisit: 'Missing patient checkup',
+          checkInAt: clock.now(),
+          version: 1,
+          createdBy: doctorActor,
+        });
+
+        const sheet = await getOrCreateCaseSheet(clinicId, dummyVisit._id, doctorActor);
+        expect(sheet.allergies).toEqual([]);
+        expect(sheet.chiefComplaint).toBe('Missing patient checkup');
+        await CaseSheet.deleteMany({ visitId: dummyVisit._id });
+        await Visit.deleteMany({ _id: dummyVisit._id });
+      });
+    });
+
+    it('re-throws unexpected error when CaseSheet.create fails with non-11000 error', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const dummyVisit = await Visit.create({
+          clinicId,
+          patientId: testPatient._id,
+          date: '2026-10-25',
+          token: 388,
+          type: 'WALK_IN',
+          status: 'WAITING',
+          checkInAt: clock.now(),
+          reasonForVisit: 'Error test',
+          version: 1,
+          createdBy: doctorActor,
+        });
+
+        const spyCreate = vi.spyOn(CaseSheet, 'create').mockRejectedValueOnce(new Error('Fatal DB Connection Error'));
+        await expect(getOrCreateCaseSheet(clinicId, dummyVisit._id, doctorActor)).rejects.toThrow(
+          /Fatal DB Connection Error/
+        );
+        spyCreate.mockRestore();
+        await Visit.deleteMany({ _id: dummyVisit._id });
+      });
+    });
+
+    it('re-throws duplicate key error if existing sheet is not found after code 11000', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const dummyVisit = await Visit.create({
+          clinicId,
+          patientId: testPatient._id,
+          date: '2026-10-25',
+          token: 387,
+          type: 'WALK_IN',
+          status: 'WAITING',
+          checkInAt: clock.now(),
+          reasonForVisit: 'Dup error test',
+          version: 1,
+          createdBy: doctorActor,
+        });
+
+        const dupError: any = new Error('E11000 duplicate key');
+        dupError.code = 11000;
+        const spyCreate = vi.spyOn(CaseSheet, 'create').mockRejectedValueOnce(dupError);
+        const spyFindOne = vi.spyOn(CaseSheet, 'findOne').mockResolvedValue(null as any);
+
+        await expect(getOrCreateCaseSheet(clinicId, dummyVisit._id, doctorActor)).rejects.toThrow(
+          /E11000 duplicate key/
+        );
+        spyCreate.mockRestore();
+        spyFindOne.mockRestore();
+        await Visit.deleteMany({ _id: dummyVisit._id });
+      });
+    });
+
+    it('saves and detects changes in teethEntries array', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
+        const updated = await saveCaseSheet(
+          clinicId,
+          testVisit._id,
+          {
+            version: sheet.version,
+            teethEntries: [{ tooth: 11, condition: 'Caries / Cavity' }], // notes undefined
+          },
+          doctorActor
+        );
+        expect(updated.teethEntries).toHaveLength(1);
+        expect(updated.teethEntries[0].tooth).toBe(11);
+
+        // Saving identical teethEntries should return existing without incrementing version
+        const savedSame = await saveCaseSheet(
+          clinicId,
+          testVisit._id,
+          {
+            version: updated.version,
+            teethEntries: [{ tooth: 11, condition: 'Caries / Cavity' }],
+          },
+          doctorActor
+        );
+        expect(savedSame.version).toBe(updated.version);
+      });
+    });
+
+    it('uses existing case sheet in VersionConflictError if fresh findOne returns null', async () => {
+      await runWithTenantContext({ clinicId: clinicId.toString(), actor: doctorActor }, async () => {
+        const sheet = await getOrCreateCaseSheet(clinicId, testVisit._id, doctorActor);
+        const spyUpdate = vi.spyOn(CaseSheet, 'findOneAndUpdate').mockResolvedValueOnce(null as any);
+        let findCount = 0;
+        const origFindOne = CaseSheet.findOne.bind(CaseSheet);
+        const spyFind = vi.spyOn(CaseSheet, 'findOne').mockImplementation((...args: any[]) => {
+          findCount++;
+          if (findCount === 1) return (origFindOne as any)(...args);
+          return {
+            session: () => Promise.resolve(null),
+            then: (resolve: any) => Promise.resolve(null).then(resolve),
+          } as any;
+        });
+
+        try {
+          await saveCaseSheet(
+            clinicId,
+            testVisit._id,
+            { version: sheet.version, chiefComplaint: 'Testing null fresh' },
+            doctorActor
+          );
+        } catch (e: any) {
+          expect(e).toBeInstanceOf(VersionConflictError);
+          expect(e.latestCaseSheet).toBeDefined();
+        } finally {
+          spyUpdate.mockRestore();
+          spyFind.mockRestore();
+        }
       });
     });
   });

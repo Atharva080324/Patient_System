@@ -113,7 +113,7 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
               id="btn-paper-a5"
               onClick={() => setPaperSize('A5')}
               className={`px-3 py-1 rounded transition ${
-                paperSize === 'A5' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
+                paperSize === 'A5' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-400'
               }`}
             >
               A5 (Default)
@@ -123,7 +123,7 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
               id="btn-paper-a4"
               onClick={() => setPaperSize('A4')}
               className={`px-3 py-1 rounded transition ${
-                paperSize === 'A4' ? 'bg-emerald-600 text-white font-bold' : 'text-slate-400'
+                paperSize === 'A4' ? 'bg-emerald-700 text-white font-bold' : 'text-slate-400'
               }`}
             >
               A4
@@ -183,7 +183,7 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
               <div className="text-right">
                 <p className="text-sm font-bold text-slate-900">{doctor.name || 'Dr. Susheel'}</p>
                 <p className="text-xs text-slate-700">{doctor.qualification || 'BDS, MDS (Prosthodontics)'}</p>
-                <p className="text-xs text-slate-500 font-mono">Reg: {doctor.registrationNumber || 'MH-DC-12345'}</p>
+                <p className="text-xs text-slate-600 font-mono">Reg: {doctor.registrationNumber || 'MH-DC-12345'}</p>
                 {isReprint && (
                   <span className="inline-block mt-1 px-2 py-0.5 rounded bg-slate-150 text-slate-700 border border-slate-300 text-[10px] font-bold uppercase">
                     Reprint
@@ -196,21 +196,21 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
           {/* Patient Details & Date / RX Banner */}
           <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 mb-5 text-xs grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Patient Name:</span>
+              <span className="text-slate-600 block text-[10px] uppercase">Patient Name:</span>
               <span className="font-bold text-slate-900">{patient.name || 'Patient'}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Patient Code / ID:</span>
+              <span className="text-slate-600 block text-[10px] uppercase">Patient Code / ID:</span>
               <span className="font-mono text-slate-800">{patient.patientCode || 'P-000000'}</span>
             </div>
             <div>
-              <span className="text-slate-500 block text-[10px] uppercase">Age / Sex:</span>
+              <span className="text-slate-600 block text-[10px] uppercase">Age / Sex:</span>
               <span className="text-slate-800">
                 {patient.ageYears ? `${patient.ageYears}y` : '—'} / {patient.sex || '—'}
               </span>
             </div>
             <div className="text-right">
-              <span className="text-slate-500 block text-[10px] uppercase">RX Number & Date:</span>
+              <span className="text-slate-600 block text-[10px] uppercase">RX Number & Date:</span>
               <span className="font-mono font-bold text-slate-900 block">{rx.rxNumber || 'DRAFT'}</span>
               <span className="text-slate-600 text-[11px]">{snapshot.date || 'Today'}</span>
             </div>
@@ -242,7 +242,7 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
                 ) : (
                   items.map((item: any, idx: number) => (
                     <tr key={idx} className="hover:bg-slate-50/50">
-                      <td className="py-2 px-2 font-mono text-slate-500">{idx + 1}</td>
+                      <td className="py-2 px-2 font-mono text-slate-600">{idx + 1}</td>
                       <td className="py-2 px-2">
                         <span className="font-bold text-slate-900 text-xs block">{item.name}</span>
                         <span className="text-[11px] text-slate-600">
@@ -280,7 +280,7 @@ export default function PrintPrescriptionClient({ prescriptionId }: PrintClientP
 
         {/* Footer & Doctor Signature Block */}
         <div className="border-t border-slate-300 pt-4 mt-8 flex justify-between items-end text-xs">
-          <div className="text-[10px] text-slate-500">
+          <div className="text-[10px] text-slate-600">
             <p>Dr. Susheel&apos;s Advanced Dental Clinic</p>
             <p className="font-mono mt-0.5">Valid with doctor signature & stamp</p>
           </div>

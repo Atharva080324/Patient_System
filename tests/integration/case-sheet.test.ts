@@ -25,7 +25,7 @@ describe('Case Sheet Service, Versioning & Concurrency Conflicts', () => {
 
     // Setup clinic
     const clinic = await Clinic.findOneAndUpdate(
-      { name: "Dr. Susheel's Advanced Dental Clinic & Implant Center" },
+      { name: "Dr. Susheel's Case Sheet Test Clinic" },
       {
         $setOnInsert: {
           address: 'Chhatrapati Sambhajinagar',
@@ -41,6 +41,10 @@ describe('Case Sheet Service, Versioning & Concurrency Conflicts', () => {
     clinicId = clinic._id;
 
     await systemScope(clinicId, async () => {
+      await Visit.deleteMany({ clinicId });
+      await CaseSheet.deleteMany({ clinicId });
+      await Patient.deleteMany({ clinicId });
+
       // Setup patient with initial allergies
       const patient = await Patient.create({
         clinicId,

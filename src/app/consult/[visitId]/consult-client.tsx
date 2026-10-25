@@ -171,6 +171,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
   // Debounce ref
   const autosaveTimerRef = useRef<NodeJS.Timeout | null>(null);
   const initialLoadDoneRef = useRef(false);
+  const lastSavedPayloadRef = useRef<string>('');
 
   // Fetch consultation workspace data
   const fetchData = useCallback(async () => {
@@ -189,6 +190,17 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
       setPastVisits(data.pastVisits || []);
       if (data.caseSheet) {
         setCaseSheet(data.caseSheet);
+        lastSavedPayloadRef.current = JSON.stringify({
+          chiefComplaint: data.caseSheet.chiefComplaint || '',
+          history: data.caseSheet.history || '',
+          medicalHistoryNotes: data.caseSheet.medicalHistoryNotes || '',
+          allergies: data.caseSheet.allergies || [],
+          examinationFindings: data.caseSheet.examinationFindings || '',
+          diagnosis: data.caseSheet.diagnosis || '',
+          treatmentDoneOrAdvised: data.caseSheet.treatmentDoneOrAdvised || '',
+          notes: data.caseSheet.notes || '',
+          teethEntries: data.caseSheet.teethEntries || [],
+        });
       }
       if (data.prescription) {
         setPrescription(data.prescription);
@@ -226,6 +238,22 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
   // Debounced autosave for case sheet
   useEffect(() => {
     if (!initialLoadDoneRef.current || !visit || visit.status !== 'IN_CONSULTATION') {
+      return;
+    }
+
+    const currentPayload = JSON.stringify({
+      chiefComplaint: caseSheet.chiefComplaint || '',
+      history: caseSheet.history || '',
+      medicalHistoryNotes: caseSheet.medicalHistoryNotes || '',
+      allergies: caseSheet.allergies || [],
+      examinationFindings: caseSheet.examinationFindings || '',
+      diagnosis: caseSheet.diagnosis || '',
+      treatmentDoneOrAdvised: caseSheet.treatmentDoneOrAdvised || '',
+      notes: caseSheet.notes || '',
+      teethEntries: caseSheet.teethEntries || [],
+    });
+
+    if (currentPayload === lastSavedPayloadRef.current) {
       return;
     }
 
@@ -269,6 +297,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
         }
 
         // Successfully saved
+        lastSavedPayloadRef.current = currentPayload;
         setCaseSheet((prev) => ({
           ...prev,
           version: resData.caseSheet.version,
@@ -276,14 +305,14 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
         setSaveStatus('saved');
         const now = new Date();
         setLastSavedTime(
-          now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+          now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
         );
         setConflictMessage(null);
       } catch (err: any) {
         console.error('Autosave error:', err);
         setSaveStatus('failed');
       }
-    }, 1500);
+    }, 1000);
 
     return () => {
       if (autosaveTimerRef.current) {
@@ -318,20 +347,15 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
 
   // Handle Complete Visit
   const handleCompleteVisit = async () => {
-    if (!confirm('Are you sure you want to complete this consultation?')) {
-      return;
-    }
-
     try {
       const res = await fetch(`/api/consult/${visitId}/complete`, { method: 'POST' });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(data.error || 'Failed to complete visit');
       }
-      alert('Visit marked as COMPLETED successfully.');
-      router.push('/queue');
+      window.location.href = '/queue';
     } catch (err: any) {
-      alert(`Error: ${err.message}`);
+      console.error('Complete visit error:', err);
     }
   };
 
@@ -656,7 +680,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
           <p className="text-slate-300 text-sm mb-6">{error || 'Visit record could not be loaded.'}</p>
           <Link
             href="/queue"
-            className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition"
+            className="inline-flex items-center px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white font-semibold transition"
           >
             ← Return to Live Queue
           </Link>
@@ -686,7 +710,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                 <span className="font-mono px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-700/50 text-xs font-bold">
                   Token #{visit.token}
                 </span>
-                <h1 className="text-lg font-bold text-white tracking-tight">{patient.name}</h1>
+                <h1 id="consult-patient-name" className="text-lg font-bold text-white tracking-tight">{patient.name}</h1>
                 <span className="text-xs text-slate-400 font-mono">({patient.patientCode})</span>
               </div>
               <p className="text-xs text-slate-400">
@@ -734,7 +758,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                 type="button"
                 id="btn-complete-visit"
                 onClick={handleCompleteVisit}
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+                className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-sm font-semibold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:ring-offset-2 focus:ring-offset-slate-900"
               >
                 ✓ Complete Visit
               </button>
@@ -775,6 +799,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
             <div className="flex items-center space-x-2">
               <button
                 type="button"
+                id="btn-copy-conflict-text"
                 onClick={handleCopyConflictText}
                 className="px-3 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs font-semibold text-white border border-slate-600"
               >
@@ -782,6 +807,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
               </button>
               <button
                 type="button"
+                id="btn-reload-latest"
                 onClick={fetchData}
                 className="px-3 py-1 rounded bg-rose-600 hover:bg-rose-500 text-xs font-semibold text-white"
               >
@@ -801,7 +827,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
               Previous Visits ({pastVisits.length})
             </h2>
             {pastVisits.length === 0 ? (
-              <p className="text-xs text-slate-500 italic">First visit at clinic. No prior history.</p>
+              <p className="text-xs text-slate-400 italic">First visit at clinic. No prior history.</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {pastVisits.map((pv) => (
@@ -830,6 +856,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
             <h2 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Workspace Navigation</h2>
             <button
               type="button"
+              id="tab-btn-casesheet"
               onClick={() => setActiveTab('casesheet')}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition ${
                 activeTab === 'casesheet'
@@ -841,6 +868,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
             </button>
             <button
               type="button"
+              id="tab-btn-prescription"
               onClick={() => setActiveTab('prescription')}
               className={`w-full text-left px-3 py-2 rounded-lg text-sm font-semibold transition ${
                 activeTab === 'prescription'
@@ -1017,8 +1045,8 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                       onClick={() => setToothView('permanent')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition ${
                         toothView === 'permanent'
-                          ? 'bg-emerald-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-emerald-700 text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Permanent (11-48)
@@ -1029,8 +1057,8 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                       onClick={() => setToothView('primary')}
                       className={`px-3 py-1 rounded text-xs font-semibold transition ${
                         toothView === 'primary'
-                          ? 'bg-emerald-600 text-white'
-                          : 'text-slate-400 hover:text-slate-200'
+                          ? 'bg-emerald-700 text-white'
+                          : 'text-slate-300 hover:text-white'
                       }`}
                     >
                       Primary / Child (51-85)
@@ -1044,7 +1072,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                     <div className="min-w-[600px] flex flex-col space-y-3 items-center">
                       {/* Upper Arch: Q1 (18-11) and Q2 (21-28) */}
                       <div className="flex items-center space-x-1">
-                        <span className="text-[10px] font-mono text-slate-500 mr-2">Maxillary Right</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium mr-2">Maxillary Right</span>
                         {PERMANENT_TEETH.slice(0, 8).map((t) => {
                           const hasFinding = caseSheet.teethEntries.some((e) => e.tooth === t);
                           return (
@@ -1086,12 +1114,12 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                             </button>
                           );
                         })}
-                        <span className="text-[10px] font-mono text-slate-500 ml-2">Maxillary Left</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium ml-2">Maxillary Left</span>
                       </div>
 
                       {/* Lower Arch: Q4 (48-41) and Q3 (31-38) */}
                       <div className="flex items-center space-x-1">
-                        <span className="text-[10px] font-mono text-slate-500 mr-2">Mandibular Right</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium mr-2">Mandibular Right</span>
                         {PERMANENT_TEETH.slice(16, 24).map((t) => {
                           const hasFinding = caseSheet.teethEntries.some((e) => e.tooth === t);
                           return (
@@ -1133,14 +1161,14 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                             </button>
                           );
                         })}
-                        <span className="text-[10px] font-mono text-slate-500 ml-2">Mandibular Left</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium ml-2">Mandibular Left</span>
                       </div>
                     </div>
                   ) : (
                     /* Primary Arch */
                     <div className="min-w-[450px] flex flex-col space-y-3 items-center">
                       <div className="flex items-center space-x-1">
-                        <span className="text-[10px] font-mono text-slate-500 mr-2">Deciduous Upper Right</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium mr-2">Deciduous Upper Right</span>
                         {PRIMARY_TEETH.slice(0, 5).map((t) => {
                           const hasFinding = caseSheet.teethEntries.some((e) => e.tooth === t);
                           return (
@@ -1182,11 +1210,11 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                             </button>
                           );
                         })}
-                        <span className="text-[10px] font-mono text-slate-500 ml-2">Deciduous Upper Left</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium ml-2">Deciduous Upper Left</span>
                       </div>
 
                       <div className="flex items-center space-x-1">
-                        <span className="text-[10px] font-mono text-slate-500 mr-2">Deciduous Lower Right</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium mr-2">Deciduous Lower Right</span>
                         {PRIMARY_TEETH.slice(10, 15).map((t) => {
                           const hasFinding = caseSheet.teethEntries.some((e) => e.tooth === t);
                           return (
@@ -1228,7 +1256,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                             </button>
                           );
                         })}
-                        <span className="text-[10px] font-mono text-slate-500 ml-2">Deciduous Lower Left</span>
+                        <span className="text-[10px] font-mono text-slate-300 font-medium ml-2">Deciduous Lower Left</span>
                       </div>
                     </div>
                   )}
@@ -1252,7 +1280,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                         </thead>
                         <tbody className="divide-y divide-slate-800">
                           {caseSheet.teethEntries.map((te) => (
-                            <tr key={te.tooth} className="hover:bg-slate-800/40">
+                            <tr key={te.tooth} id={`tooth-finding-row-${te.tooth}`} className="hover:bg-slate-800/40">
                               <td className="p-2 font-mono font-bold text-amber-400">
                                 #{te.tooth} ({getToothLabel(te.tooth)})
                               </td>
@@ -1347,7 +1375,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                       <tbody className="divide-y divide-slate-800">
                         {prescription.items.map((item, idx) => (
                           <tr key={idx} className="hover:bg-slate-800/40">
-                            <td className="p-2.5 font-mono text-slate-500">{idx + 1}</td>
+                            <td className="p-2.5 font-mono text-slate-400">{idx + 1}</td>
                             <td className="p-2.5 font-bold text-slate-100">
                               {item.name} <span className="text-slate-400 font-normal">({item.form}, {item.strength})</span>
                             </td>
@@ -1538,7 +1566,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                     </h3>
 
                     {(!prescription || prescription.items.length === 0) ? (
-                      <div className="p-8 border border-dashed border-slate-700 rounded-xl text-center text-xs text-slate-500">
+                      <div className="p-8 border border-dashed border-slate-700 rounded-xl text-center text-xs text-slate-400">
                         No medicines added yet. Use the search bar above or apply a template.
                       </div>
                     ) : (
@@ -1551,7 +1579,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                           >
                             <div className="flex items-center justify-between">
                               <span className="font-bold text-sm text-slate-100 flex items-center space-x-2">
-                                <span className="font-mono text-slate-500">#{idx + 1}</span>
+                                <span className="font-mono text-slate-400">#{idx + 1}</span>
                                 <span>{line.name}</span>
                                 <span className="text-xs text-slate-400 font-normal">
                                   ({line.form}, {line.strength})
@@ -1571,6 +1599,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                                 <label className="block text-slate-400 mb-1">Dose</label>
                                 <input
                                   type="text"
+                                  id={`rx-dose-${idx}`}
                                   value={line.dose}
                                   onChange={(e) => handleUpdateMedicineLine(idx, 'dose', e.target.value)}
                                   placeholder="e.g. 1 tab, 500mg"
@@ -1594,6 +1623,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                                 <label className="block text-slate-400 mb-1">Frequency *</label>
                                 <input
                                   type="text"
+                                  id={`rx-freq-${idx}`}
                                   value={line.frequency}
                                   onChange={(e) => handleUpdateMedicineLine(idx, 'frequency', e.target.value)}
                                   placeholder="e.g. 1-0-1, 1-1-1"
@@ -1617,6 +1647,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                                 <label className="block text-slate-400 mb-1">Duration *</label>
                                 <input
                                   type="text"
+                                  id={`rx-duration-${idx}`}
                                   value={line.duration}
                                   onChange={(e) => handleUpdateMedicineLine(idx, 'duration', e.target.value)}
                                   placeholder="e.g. 3 days, 5 days"
@@ -1640,6 +1671,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                                 <label className="block text-slate-400 mb-1">Instructions</label>
                                 <input
                                   type="text"
+                                  id={`rx-instruction-${idx}`}
                                   value={line.instruction}
                                   onChange={(e) => handleUpdateMedicineLine(idx, 'instruction', e.target.value)}
                                   placeholder="e.g. After food"
@@ -1727,6 +1759,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
               </label>
               <select
                 id="modal-tooth-condition"
+                autoFocus
                 value={newToothCondition}
                 onChange={(e) => setNewToothCondition(e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-sm text-slate-100 focus:outline-none focus:border-emerald-500"
@@ -1765,7 +1798,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
                 type="button"
                 id="btn-save-tooth-finding"
                 onClick={handleAddToothFinding}
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow"
+                className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-xs font-bold text-white shadow"
               >
                 Save Tooth Finding
               </button>
@@ -1985,7 +2018,7 @@ export default function ConsultClient({ visitId }: { visitId: string }) {
               <button
                 type="submit"
                 id="btn-submit-save-set"
-                className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow"
+                className="px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-xs font-bold text-white shadow"
               >
                 Save Template
               </button>

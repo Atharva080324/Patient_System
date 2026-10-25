@@ -68,22 +68,32 @@ export async function getOrCreateCaseSheet(
   const patient = await Patient.findOne({ clinicId: clinicObjectId, _id: visit.patientId });
   const initialAllergies = patient?.medicalHistory?.allergies || [];
 
-  sheet = await CaseSheet.create({
-    clinicId: clinicObjectId,
-    visitId: visitObjectId,
-    patientId: visit.patientId,
-    version: 1,
-    chiefComplaint: visit.reasonForVisit || '',
-    history: '',
-    medicalHistoryNotes: '',
-    allergies: initialAllergies,
-    examinationFindings: '',
-    diagnosis: '',
-    treatmentDoneOrAdvised: '',
-    notes: '',
-    teethEntries: [],
-    createdBy: actor,
-  });
+  try {
+    sheet = await CaseSheet.create({
+      clinicId: clinicObjectId,
+      visitId: visitObjectId,
+      patientId: visit.patientId,
+      version: 1,
+      chiefComplaint: visit.reasonForVisit,
+      history: '',
+      medicalHistoryNotes: '',
+      allergies: initialAllergies,
+      examinationFindings: '',
+      diagnosis: '',
+      treatmentDoneOrAdvised: '',
+      notes: '',
+      teethEntries: [],
+      createdBy: actor,
+    });
+  } catch (err: any) {
+    if (err.code === 11000) {
+      const existing = await CaseSheet.findOne({ clinicId: clinicObjectId, visitId: visitObjectId });
+      if (existing) {
+        return existing;
+      }
+    }
+    throw err;
+  }
 
   await AuditLog.create({
     clinicId: clinicObjectId,
@@ -144,9 +154,24 @@ export async function saveCaseSheet(
       const existingVal = existing.get(field);
 
       const isChanged =
-        Array.isArray(incomingVal)
-          ? JSON.stringify(incomingVal) !== JSON.stringify(existingVal)
-          : incomingVal !== existingVal;
+        field === 'teethEntries' && Array.isArray(incomingVal)
+          ? JSON.stringify(
+              incomingVal.map((e: any) => ({
+                tooth: e.tooth,
+                condition: e.condition,
+                notes: e.notes || '',
+              }))
+            ) !==
+            JSON.stringify(
+              ((existingVal as any[]) || []).map((e: any) => ({
+                tooth: e.tooth,
+                condition: e.condition,
+                notes: e.notes || '',
+              }))
+            )
+          : Array.isArray(incomingVal)
+            ? JSON.stringify(incomingVal) !== JSON.stringify(existingVal)
+            : incomingVal !== existingVal;
 
       if (isChanged) {
         changedFieldNames.push(field);

@@ -145,7 +145,11 @@ export async function registerWalkInPatient(
 
     let allocatedPatientCode: string | undefined;
     if (isNewPatient) {
-      allocatedPatientCode = await nextPatientCode(cId);
+      let code = await nextPatientCode(cId);
+      while (await Patient.exists({ clinicId: cId, patientCode: code })) {
+        code = await nextPatientCode(cId);
+      }
+      allocatedPatientCode = code;
     }
 
     // 5. Execute atomic creation inside transaction

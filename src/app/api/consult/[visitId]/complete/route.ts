@@ -56,7 +56,7 @@ export const POST = withAuth(async (req: NextRequest, auth) => {
   }
 
   try {
-    const updatedVisit = await transitionVisitStatus(clinicId, visitId, 'COMPLETED', visit.version, actor);
+    const updatedVisit = await transitionVisitStatus(clinicId, visitId, 'COMPLETE', visit.version, actor);
     return NextResponse.json({
       success: true,
       visit: {
